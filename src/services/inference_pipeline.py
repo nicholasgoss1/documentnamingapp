@@ -64,12 +64,18 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
     record.what = normalize_what(what, settings)
 
     # Document-type-based WHO overrides
+    what_lower = record.what.lower() if record.what else ""
+
+    # IDR/FDL documents are always from the Financial Firm
+    ff_doc_types = ["idr fdl", "idr", "final decision letter"]
+    if any(dt in what_lower for dt in ff_doc_types):
+        record.who = "FF"
+
     # These document types are always complainant-side regardless of issuer
     complainant_doc_types = [
         "certificate of insurance", "letter of engagement",
         "aaf to be signed", "afca submission",
     ]
-    what_lower = record.what.lower() if record.what else ""
     if any(dt in what_lower for dt in complainant_doc_types):
         record.who = "Complainant"
 
