@@ -7,7 +7,6 @@ from PySide6.QtCore import Qt, QAbstractTableModel, QModelIndex
 from PySide6.QtGui import QColor
 
 from src.core.models import DocumentRecord, RenameStatus, DuplicateStatus
-from src.services.duplicate_detector import _append_duplicate
 
 COLUMNS = [
     "Original Filename",
@@ -26,11 +25,11 @@ EDITABLE_COLUMNS = {1, 2, 3, 4}  # WHO, DATE, ENTITY, WHAT
 
 
 def _rebuild_filename(rec: DocumentRecord):
-    """Rebuild proposed filename, preserving DUPLICATE suffix if applicable."""
-    rec.proposed_filename = rec.build_proposed_filename()
+    """Rebuild proposed filename, keeping DUPLICATE.pdf for duplicate records."""
     if rec.duplicate_status not in (DuplicateStatus.NONE, None):
-        if " - DUPLICATE" not in rec.proposed_filename:
-            rec.proposed_filename = _append_duplicate(rec.proposed_filename)
+        rec.proposed_filename = "DUPLICATE.pdf"
+    else:
+        rec.proposed_filename = rec.build_proposed_filename()
 
 
 class DocumentTableModel(QAbstractTableModel):

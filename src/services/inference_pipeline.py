@@ -65,17 +65,25 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
 
     # Document-type-based WHO overrides
     what_lower = record.what.lower() if record.what else ""
-    text_lower = (record.page1_text + " " + record.extracted_text).lower()
-    is_claimsco = "claimsco" in text_lower
 
-    # IDR/FDL documents are from the Financial Firm — UNLESS the document
-    # is from ClaimsCo (who writes to the insurer's IDR team on behalf of
-    # the complainant, identifiable by either ClaimsCo logo or signature).
+    # Detect if the document is authored BY ClaimsCo:
+    # - ClaimsCo logo in the letterhead (top ~500 chars of page 1), OR
+    # - ClaimsCo detected as the entity (from entity inference)
+    # This avoids false positives from insurer letters that merely mention ClaimsCo.
+    page1_top = record.page1_text[:500].lower() if record.page1_text else ""
+    entity_lower = record.entity.lower() if record.entity else ""
+    is_from_claimsco = "claimsco" in page1_top or "claimsco" in entity_lower
+
+    # IDR/FDL documents are from the Financial Firm — UNLESS authored by
+    # ClaimsCo (who writes to the insurer's IDR team on behalf of the
+    # complainant, identifiable by either ClaimsCo logo or signature).
     ff_doc_types = ["idr fdl", "idr", "final decision letter"]
-    if any(dt in what_lower for dt in ff_doc_types) and not is_claimsco:
-        record.who = "FF"
-    elif any(dt in what_lower for dt in ff_doc_types) and is_claimsco:
-        record.who = "Complainant"
+    if any(dt in what_lower for dt in ff_doc_types):
+        if is_from_claimsco:
+            record.who = "Complainant"
+            record.what = "ClaimsCo Letter to IDR"
+        else:
+            record.who = "FF"
 
     # These document types are always complainant-side regardless of issuer
     complainant_doc_types = [

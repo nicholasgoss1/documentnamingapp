@@ -20,9 +20,9 @@ class TestDuplicateDetection(unittest.TestCase):
         records = detect_duplicates([r1, r2])
         self.assertEqual(records[0].duplicate_status, DuplicateStatus.EXACT_DUPLICATE)
         self.assertEqual(records[1].duplicate_status, DuplicateStatus.EXACT_DUPLICATE)
-        # First keeps its name, second gets DUPLICATE
+        # First keeps its name, second becomes DUPLICATE.pdf
         self.assertEqual(records[0].proposed_filename, "FF - 01.01.2024 - Report.pdf")
-        self.assertIn("DUPLICATE", records[1].proposed_filename)
+        self.assertEqual(records[1].proposed_filename, "DUPLICATE.pdf")
 
     def test_exact_duplicate_three_files(self):
         r1 = DocumentRecord(file_hash="abc", content_hash="x1", proposed_filename="Report.pdf")
@@ -30,8 +30,8 @@ class TestDuplicateDetection(unittest.TestCase):
         r3 = DocumentRecord(file_hash="abc", content_hash="x1", proposed_filename="Report.pdf")
         records = detect_duplicates([r1, r2, r3])
         self.assertNotIn("DUPLICATE", records[0].proposed_filename)
-        self.assertIn("DUPLICATE", records[1].proposed_filename)
-        self.assertIn("DUPLICATE", records[2].proposed_filename)
+        self.assertEqual(records[1].proposed_filename, "DUPLICATE.pdf")
+        self.assertEqual(records[2].proposed_filename, "DUPLICATE.pdf")
 
     def test_content_duplicate(self):
         r1 = DocumentRecord(file_hash="aaa", content_hash="same", proposed_filename="A.pdf")
@@ -40,7 +40,7 @@ class TestDuplicateDetection(unittest.TestCase):
         self.assertEqual(records[0].duplicate_status, DuplicateStatus.LIKELY_DUPLICATE)
         self.assertEqual(records[1].duplicate_status, DuplicateStatus.LIKELY_DUPLICATE)
         self.assertNotIn("DUPLICATE", records[0].proposed_filename)
-        self.assertIn("DUPLICATE", records[1].proposed_filename)
+        self.assertEqual(records[1].proposed_filename, "DUPLICATE.pdf")
 
     def test_non_duplicate_unchanged(self):
         r1 = DocumentRecord(file_hash="a1", content_hash="c1", proposed_filename="Report.pdf")
@@ -51,16 +51,24 @@ class TestDuplicateDetection(unittest.TestCase):
         self.assertNotIn("DUPLICATE", records[0].proposed_filename)
         self.assertNotIn("DUPLICATE", records[1].proposed_filename)
 
-    def test_duplicate_filename_format(self):
+    def test_duplicate_filename_is_just_duplicate(self):
         r1 = DocumentRecord(file_hash="a1", content_hash="c1",
                             proposed_filename="FF - 01.01.2024 - Site Report.pdf")
         r2 = DocumentRecord(file_hash="a1", content_hash="c1",
                             proposed_filename="FF - 01.01.2024 - Site Report.pdf")
         records = detect_duplicates([r1, r2])
-        self.assertEqual(
-            records[1].proposed_filename,
-            "FF - 01.01.2024 - Site Report - DUPLICATE.pdf"
-        )
+        self.assertEqual(records[1].proposed_filename, "DUPLICATE.pdf")
+
+    def test_three_duplicates_get_numbered(self):
+        """Three duplicates: first keeps name, second and third become DUPLICATE with numbers."""
+        r1 = DocumentRecord(file_hash="abc", content_hash="x1", proposed_filename="Report.pdf")
+        r2 = DocumentRecord(file_hash="abc", content_hash="x1", proposed_filename="Report.pdf")
+        r3 = DocumentRecord(file_hash="abc", content_hash="x1", proposed_filename="Report.pdf")
+        records = detect_duplicates([r1, r2, r3])
+        records = resolve_name_collisions(records)
+        self.assertEqual(records[0].proposed_filename, "Report.pdf")
+        self.assertEqual(records[1].proposed_filename, "DUPLICATE.pdf")
+        self.assertEqual(records[2].proposed_filename, "DUPLICATE (2).pdf")
 
 
 class TestNameCollisionResolution(unittest.TestCase):

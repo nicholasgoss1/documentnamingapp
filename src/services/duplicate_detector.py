@@ -4,7 +4,7 @@ Detects exact binary duplicates, content duplicates, and filename collisions.
 
 Duplicate naming rule:
 - First occurrence of a duplicate: renamed normally by convention
-- Second, third etc: proposed filename gets " - DUPLICATE" appended
+- Second, third etc: renamed to just "DUPLICATE.pdf" (or "DUPLICATE (2).pdf" etc)
 """
 from typing import Dict, List
 from collections import defaultdict
@@ -15,8 +15,8 @@ from src.core.models import DocumentRecord, DuplicateStatus
 def detect_duplicates(records: List[DocumentRecord]) -> List[DocumentRecord]:
     """
     Detect duplicates among records. Modifies records in-place with duplicate_status.
-    First occurrence keeps its proposed filename. Subsequent occurrences get
-    ' - DUPLICATE' appended to their proposed filename.
+    First occurrence keeps its proposed filename. Subsequent occurrences are
+    renamed to just "DUPLICATE.pdf".
     Returns the modified list.
     """
     # 1. Exact binary duplicates (same file hash)
@@ -31,9 +31,7 @@ def detect_duplicates(records: List[DocumentRecord]) -> List[DocumentRecord]:
             for idx in indices:
                 records[idx].duplicate_status = DuplicateStatus.EXACT_DUPLICATE
             for idx in indices[1:]:
-                records[idx].proposed_filename = _append_duplicate(
-                    records[idx].proposed_filename
-                )
+                records[idx].proposed_filename = "DUPLICATE.pdf"
 
     # 2. Content duplicates (same content hash, different file hash)
     content_groups: Dict[str, List[int]] = defaultdict(list)
@@ -47,12 +45,10 @@ def detect_duplicates(records: List[DocumentRecord]) -> List[DocumentRecord]:
                 if records[idx].duplicate_status == DuplicateStatus.NONE:
                     records[idx].duplicate_status = DuplicateStatus.LIKELY_DUPLICATE
             for idx in indices[1:]:
-                if " - DUPLICATE" not in records[idx].proposed_filename:
-                    records[idx].proposed_filename = _append_duplicate(
-                        records[idx].proposed_filename
-                    )
+                if records[idx].proposed_filename != "DUPLICATE.pdf":
+                    records[idx].proposed_filename = "DUPLICATE.pdf"
 
-    # 3. Filename collisions (same proposed filename, not already marked DUPLICATE)
+    # 3. Filename collisions (same proposed filename, not already DUPLICATE)
     name_groups: Dict[str, List[int]] = defaultdict(list)
     for i, rec in enumerate(records):
         if rec.proposed_filename:
@@ -64,19 +60,15 @@ def detect_duplicates(records: List[DocumentRecord]) -> List[DocumentRecord]:
                 if records[idx].duplicate_status == DuplicateStatus.NONE:
                     records[idx].duplicate_status = DuplicateStatus.NAME_COLLISION
             for idx in indices[1:]:
-                if " - DUPLICATE" not in records[idx].proposed_filename:
-                    records[idx].proposed_filename = _append_duplicate(
-                        records[idx].proposed_filename
-                    )
+                if records[idx].proposed_filename != "DUPLICATE.pdf":
+                    records[idx].proposed_filename = "DUPLICATE.pdf"
 
     return records
 
 
 def _append_duplicate(filename: str) -> str:
-    """Append ' - DUPLICATE' before the .pdf extension."""
-    if filename.lower().endswith(".pdf"):
-        return filename[:-4] + " - DUPLICATE.pdf"
-    return filename + " - DUPLICATE"
+    """Return 'DUPLICATE.pdf' for duplicate files."""
+    return "DUPLICATE.pdf"
 
 
 def resolve_name_collisions(records: List[DocumentRecord]) -> List[DocumentRecord]:
