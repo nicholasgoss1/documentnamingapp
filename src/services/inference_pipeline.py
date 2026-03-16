@@ -83,33 +83,28 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
     mapping = settings.get("who_mapping", {})
     ff_ents = [e.lower() for e in mapping.get("ff_entities", [])]
 
-    # IDR/FDL documents: determine authorship by checking the FROM party
-    # (top-right letterhead region).  An IDR FDL from an insurer is "FF";
-    # a letter TO the insurer's IDR from ClaimsCo is "ClaimsCo Letter to IDR".
+    # IDR/FDL documents: determine authorship by checking for ClaimsCo
+    # authorship phrases FIRST (definitive — an insurer's IDR FDL would
+    # never say "on behalf of our mutual client"), then fall back to
+    # spatial layout.  We check phrases first because ClaimsCo's logo is
+    # often an image (not OCR-extractable), and the addressee text (e.g.
+    # "Allianz Insurance") can end up in the top-right region depending
+    # on the letter layout.
     ff_doc_types = ["idr fdl", "idr", "final decision letter"]
     if any(dt in what_lower for dt in ff_doc_types):
-        # Step 1: check top-right (letterhead) for a known FF entity.
-        # If the from-party is a known insurer → definitely an IDR FDL.
-        from_is_ff = any(ent in top_right for ent in ff_ents)
-        if from_is_ff:
-            record.who = "FF"
+        claimsco_authorship_phrases = [
+            "on behalf of our mutual client",
+            "claims made easy",
+        ]
+        is_from_claimsco = (
+            "claimsco" in top_right
+            or any(phrase in page1_normalized for phrase in claimsco_authorship_phrases)
+        )
+        if is_from_claimsco:
+            record.who = "Complainant"
+            record.what = "ClaimsCo Letter to IDR"
         else:
-            # Step 2: check if the document is authored BY ClaimsCo.
-            # ClaimsCo logo is often an image (not OCR-extractable), so we
-            # also check distinctive authorship phrases in the body text.
-            claimsco_authorship_phrases = [
-                "on behalf of our mutual client",
-                "claims made easy",
-            ]
-            is_from_claimsco = (
-                "claimsco" in top_right
-                or any(phrase in page1_normalized for phrase in claimsco_authorship_phrases)
-            )
-            if is_from_claimsco:
-                record.who = "Complainant"
-                record.what = "ClaimsCo Letter to IDR"
-            else:
-                record.who = "FF"
+            record.who = "FF"
 
     # ClaimsCo-authored non-IDR documents: detect for WHO override
     claimsco_authorship_phrases = [
