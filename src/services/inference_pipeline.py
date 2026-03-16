@@ -69,39 +69,53 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
     # Document-type-based WHO overrides
     what_lower = record.what.lower() if record.what else ""
 
-    # Detect if the document is authored BY ClaimsCo using spatial layout:
-    # In standard letter layout, the top-right contains the "from" party
-    # (letterhead/logo) and the bottom contains the signature block.
-    # The top-left is the "to" party (addressee) — we must NOT treat
-    # entities found there as the author.
-    # We also check distinctive authorship phrases as a fallback when
-    # the ClaimsCo logo is an image and not extractable as text.
+    # Spatial layout regions for letter-format documents.
     page1 = record.page1_text or ""
     page1_lower = page1.lower()
     regions = record.page1_regions or {}
-    from_region = (regions.get("top_right", "") + "\n" + regions.get("bottom", "")).lower()
-    entity_lower = record.entity.lower() if record.entity else ""
+    top_right = regions.get("top_right", "").lower()
+
+    # Build entity lookup for from-party detection
+    mapping = settings.get("who_mapping", {})
+    ff_ents = [e.lower() for e in mapping.get("ff_entities", [])]
+
+    # IDR/FDL documents: determine authorship by checking the FROM party
+    # (top-right letterhead region).  An IDR FDL from an insurer is "FF";
+    # a letter TO the insurer's IDR from ClaimsCo is "ClaimsCo Letter to IDR".
+    ff_doc_types = ["idr fdl", "idr", "final decision letter"]
+    if any(dt in what_lower for dt in ff_doc_types):
+        # Step 1: check top-right (letterhead) for a known FF entity.
+        # If the from-party is a known insurer → definitely an IDR FDL.
+        from_is_ff = any(ent in top_right for ent in ff_ents)
+        if from_is_ff:
+            record.who = "FF"
+        else:
+            # Step 2: check if the document is authored BY ClaimsCo.
+            # ClaimsCo logo is often an image (not OCR-extractable), so we
+            # also check distinctive authorship phrases in the body text.
+            claimsco_authorship_phrases = [
+                "on behalf of our mutual client",
+                "claims made easy",
+            ]
+            is_from_claimsco = (
+                "claimsco" in top_right
+                or any(phrase in page1_lower for phrase in claimsco_authorship_phrases)
+            )
+            if is_from_claimsco:
+                record.who = "Complainant"
+                record.what = "ClaimsCo Letter to IDR"
+            else:
+                record.who = "FF"
+
+    # ClaimsCo-authored non-IDR documents: detect for WHO override
     claimsco_authorship_phrases = [
         "on behalf of our mutual client",
         "claims made easy",
-        "delegation of authority for the above claim",
     ]
     is_from_claimsco = (
-        "claimsco" in from_region
-        or "claimsco" in entity_lower
+        "claimsco" in top_right
         or any(phrase in page1_lower for phrase in claimsco_authorship_phrases)
     )
-
-    # IDR/FDL documents are from the Financial Firm — UNLESS authored by
-    # ClaimsCo (who writes to the insurer's IDR team on behalf of the
-    # complainant, identifiable by either ClaimsCo logo or signature).
-    ff_doc_types = ["idr fdl", "idr", "final decision letter"]
-    if any(dt in what_lower for dt in ff_doc_types):
-        if is_from_claimsco:
-            record.who = "Complainant"
-            record.what = "ClaimsCo Letter to IDR"
-        else:
-            record.who = "FF"
 
     # These document types are always complainant-side regardless of issuer
     complainant_doc_types = [
