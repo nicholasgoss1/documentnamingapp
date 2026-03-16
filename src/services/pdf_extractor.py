@@ -3,10 +3,22 @@ PDF text extraction and preview using PyMuPDF (fitz).
 All processing is local. No network calls.
 """
 import hashlib
+import re
 from pathlib import Path
 from typing import Optional
 
 import fitz  # PyMuPDF
+
+# Unicode directional formatting characters that some PDFs embed around
+# every word.  These are invisible but break substring matching.
+_UNICODE_JUNK = re.compile(
+    '[\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069]'
+)
+
+
+def _clean_text(text: str) -> str:
+    """Strip Unicode directional/formatting characters from extracted text."""
+    return _UNICODE_JUNK.sub('', text)
 
 
 def extract_text(file_path: str, max_pages: int = 5) -> str:
@@ -18,7 +30,7 @@ def extract_text(file_path: str, max_pages: int = 5) -> str:
             page = doc[i]
             text_parts.append(page.get_text("text"))
         doc.close()
-        return "\n".join(text_parts)
+        return _clean_text("\n".join(text_parts))
     except Exception:
         return ""
 
@@ -32,7 +44,7 @@ def extract_page1_text(file_path: str) -> str:
         else:
             text = ""
         doc.close()
-        return text
+        return _clean_text(text)
     except Exception:
         return ""
 
@@ -108,7 +120,7 @@ def extract_page1_spatial(file_path: str) -> dict:
             if block[6] != 0:  # skip image blocks
                 continue
             x0, y0, x1, y1, text = block[0], block[1], block[2], block[3], block[4]
-            text = text.strip()
+            text = _clean_text(text.strip())
             if not text:
                 continue
 
