@@ -1,0 +1,293 @@
+"""
+Document classifier: infers WHO, ENTITY, WHAT from extracted text and filename.
+All processing is local.
+"""
+import re
+from typing import Tuple, Optional
+
+from src.core.settings import Settings
+
+
+def detect_annexure(filename: str) -> Tuple[bool, str]:
+    """Detect if filename is an annexure wrapper. Returns (is_annexure, annexure_number)."""
+    m = re.match(r'^[Aa]nnexure\s*(\d+)', filename)
+    if m:
+        return True, m.group(1)
+    m = re.match(r'^[Aa]nnex\.?\s*(\d+)', filename)
+    if m:
+        return True, m.group(1)
+    return False, ""
+
+
+def infer_who(page1_text: str, full_text: str, filename: str,
+              entity: str, settings: Settings) -> Tuple[str, int]:
+    """
+    Infer the WHO field based on provenance rules.
+    Returns (who_string, confidence_contribution 0-20).
+    """
+    text_lower = (page1_text + " " + full_text + " " + filename).lower()
+    entity_lower = entity.lower() if entity else ""
+    mapping = settings.get("who_mapping", {})
+
+    complainant_entities = [e.lower() for e in mapping.get("complainant_entities", [])]
+    ff_entities = [e.lower() for e in mapping.get("ff_entities", [])]
+    afca_entities = [e.lower() for e in mapping.get("afca_entities", [])]
+
+    # Check entity first (most reliable)
+    if entity_lower:
+        if entity_lower in complainant_entities:
+            return "Complainant", 18
+        if entity_lower in afca_entities:
+            return "AFCA", 18
+        if entity_lower in ff_entities:
+            return "FF", 18
+
+    # Check keywords in text
+    afca_kw = mapping.get("afca_keywords", [])
+    complainant_kw = mapping.get("complainant_keywords", [])
+    ff_kw = mapping.get("ff_keywords", [])
+
+    afca_score = sum(1 for kw in afca_kw if kw.lower() in text_lower)
+    comp_score = sum(1 for kw in complainant_kw if kw.lower() in text_lower)
+    ff_score = sum(1 for kw in ff_kw if kw.lower() in text_lower)
+
+    # ClaimsCo documents are always Complainant-side
+    if "claimsco" in text_lower:
+        return "Complainant", 17
+
+    # Complainant-side document types (check before AFCA)
+    comp_doc_types = [
+        "afca submission", "submission to afca", "letter of engagement",
+        "authority and access form", "aaf",
+        "on behalf of the complainant", "authorised representative",
+    ]
+    for dt in comp_doc_types:
+        if dt in text_lower:
+            return "Complainant", 16
+
+    # AFCA-issued documents (from AFCA to parties)
+    if "afca" in text_lower and ("request for information" in text_lower
+                                   or "preliminary assessment" in text_lower):
+        return "AFCA", 16
+    # AFCA notices - only if not from complainant side
+    if "australian financial complaints authority" in text_lower:
+        if "request for information" in text_lower or "preliminary assessment" in text_lower:
+            return "AFCA", 16
+
+    # Specific entity checks
+    for ent in complainant_entities:
+        if ent in text_lower:
+            return "Complainant", 15
+
+    # Complainant notice of response (responds to insurer)
+    if "notice of response" in text_lower:
+        if any(kw in text_lower for kw in ["claimsco", "complainant", "on behalf", "we respond"]):
+            return "Complainant", 14
+
+    if afca_score > ff_score and afca_score > comp_score:
+        return "AFCA", 12
+    if comp_score > ff_score:
+        return "Complainant", 12
+    if ff_score > 0:
+        return "FF", 12
+
+    # Default to FF for most insurer-side / third-party material
+    return "FF", 6
+
+
+def infer_entity(page1_text: str, full_text: str, filename: str,
+                 settings: Settings) -> Tuple[str, int]:
+    """
+    Infer the ENTITY field.
+    Returns (entity_string, confidence_contribution 0-20).
+    """
+    preferred = settings.get("preferred_entities", [])
+    aliases = settings.get("entity_aliases", {})
+    text = page1_text + " " + full_text + " " + filename
+
+    # Build a search map: all preferred entities + their aliases
+    search_map = {}
+    for ent in preferred:
+        search_map[ent.lower()] = ent
+    for alias, canonical in aliases.items():
+        search_map[alias.lower()] = canonical
+
+    # Search for entities, longest match first
+    found = []
+    for key in sorted(search_map.keys(), key=len, reverse=True):
+        if key in text.lower():
+            canonical = search_map[key]
+            if canonical not in [f[0] for f in found]:
+                # Find the position for priority
+                pos = text.lower().index(key)
+                found.append((canonical, pos))
+
+    if found:
+        # Return the one that appears earliest / most prominent
+        found.sort(key=lambda x: x[1])
+        return found[0][0], 15
+
+    return "", 0
+
+
+def infer_what(page1_text: str, full_text: str, filename: str,
+               settings: Settings) -> Tuple[str, int]:
+    """
+    Infer the WHAT (document type/description) field.
+    Returns (what_string, confidence_contribution 0-20).
+    """
+    doc_keywords = settings.get("doc_type_keywords", {})
+    preferred_labels = settings.get("preferred_doc_labels", [])
+    text_lower = (page1_text + " " + filename).lower()
+    full_lower = full_text.lower()
+
+    best_match = ""
+    best_score = 0
+    best_specificity = 0  # Length of matching keyword (prefer longer/more specific)
+
+    for label, keywords in doc_keywords.items():
+        for kw in keywords:
+            kw_lower = kw.lower()
+            # Check page 1 and filename first (higher weight)
+            if kw_lower in text_lower:
+                score = 20
+                if kw_lower in page1_text[:500].lower():
+                    score = 25  # Very high if in heading area
+            elif kw_lower in full_lower:
+                score = 10
+            else:
+                continue
+
+            specificity = len(kw_lower)
+            # Prefer more specific (longer) keyword matches at equal or better score
+            if score > best_score or (score == best_score and specificity > best_specificity):
+                best_score = score
+                best_match = label
+                best_specificity = specificity
+
+    if best_match:
+        # Handle progress report numbering
+        if best_match == "Progress Report":
+            # Try to find a number
+            m = re.search(r'progress\s+report\s*[#:]?\s*(\d+)', text_lower)
+            if m:
+                best_match = f"Progress Report {m.group(1)}"
+            else:
+                best_match = "Progress Report 1"
+
+        # Check for Notice of Response from QBE specifically
+        if best_match == "Notice of Response":
+            if "qbe" in text_lower:
+                best_match = "Notice of Response from QBE"
+
+        return best_match, min(20, best_score)
+
+    # Fallback: try to extract a title from page 1 heading
+    heading = extract_heading(page1_text)
+    if heading:
+        return normalize_what_label(heading, preferred_labels), 8
+
+    # Last resort: use original filename cleaned up
+    clean = clean_filename_for_what(filename)
+    if clean:
+        return normalize_what_label(clean, preferred_labels), 4
+
+    return "", 0
+
+
+def extract_heading(page1_text: str) -> str:
+    """Try to extract a document title/heading from the top of page 1."""
+    lines = page1_text.strip().split("\n")
+    # Look for a prominent line in the first 10 lines
+    for line in lines[:10]:
+        line = line.strip()
+        if not line:
+            continue
+        # Skip very short lines (likely page numbers, logos)
+        if len(line) < 5:
+            continue
+        # Skip lines that look like addresses or dates
+        if re.match(r'^\d', line) and len(line) < 20:
+            continue
+        if "@" in line or "www." in line or "http" in line:
+            continue
+        # This might be a heading
+        if len(line) < 80:
+            return line
+    return ""
+
+
+def clean_filename_for_what(filename: str) -> str:
+    """Clean original filename to extract a potential WHAT value."""
+    name = filename
+    if name.lower().endswith(".pdf"):
+        name = name[:-4]
+    # Remove common prefixes
+    name = re.sub(r'^[Aa]nnexure\s*\d+\s*[-_]?\s*', '', name)
+    # Remove dates
+    name = re.sub(r'\d{1,2}[./\-]\d{1,2}[./\-]\d{4}', '', name)
+    name = re.sub(r'\d{4}[./\-]\d{1,2}[./\-]\d{1,2}', '', name)
+    # Clean separators
+    name = re.sub(r'[_\-]+', ' ', name)
+    name = re.sub(r'\s+', ' ', name).strip()
+    return name
+
+
+def normalize_what_label(label: str, preferred_labels: list) -> str:
+    """Normalize a WHAT label to title case and match preferred labels."""
+    label_lower = label.lower().strip()
+    for preferred in preferred_labels:
+        if preferred.lower() == label_lower:
+            return preferred
+        if label_lower in preferred.lower() or preferred.lower() in label_lower:
+            return preferred
+    # Title case
+    return title_case_smart(label)
+
+
+def title_case_smart(text: str) -> str:
+    """Title case but preserve known acronyms."""
+    acronyms = {"afca", "qbe", "pds", "idr", "fdl", "coi", "acb", "ruca", "aaf", "bom"}
+    words = text.split()
+    result = []
+    for word in words:
+        if word.lower() in acronyms:
+            result.append(word.upper())
+        elif word.startswith("$"):
+            result.append(word)
+        else:
+            result.append(word.capitalize())
+    return " ".join(result)
+
+
+def should_include_entity(doc_type: str, entity: str, settings: Settings) -> bool:
+    """Determine if ENTITY should be included based on document class rules."""
+    if not entity:
+        return False
+    rules = settings.get("entity_include_rules", {})
+    # Check exact match
+    if doc_type in rules:
+        return rules[doc_type]
+    # Check partial match
+    for rule_type, include in rules.items():
+        if rule_type.lower() in doc_type.lower():
+            return include
+    # Default: include if entity is present
+    return True
+
+
+def extract_quote_amount(text: str) -> str:
+    """Try to extract a dollar amount from a quote document."""
+    patterns = [
+        r'\$\s*([\d,]+\.?\d*)',
+        r'total[:\s]*\$\s*([\d,]+\.?\d*)',
+        r'quote[:\s]*\$\s*([\d,]+\.?\d*)',
+        r'amount[:\s]*\$\s*([\d,]+\.?\d*)',
+    ]
+    for pat in patterns:
+        m = re.search(pat, text, re.IGNORECASE)
+        if m:
+            amount = m.group(1)
+            # Format with $ prefix
+            return f"${amount}"
+    return ""
