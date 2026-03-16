@@ -104,6 +104,7 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
             # complainant-side letter (ClaimsCo Letter to IDR)
             record.who = "Complainant"
             record.what = "ClaimsCo Letter to IDR"
+            record.entity = "ClaimsCo"
         else:
             # Fallback: check ClaimsCo authorship phrases
             claimsco_authorship_phrases = [
@@ -118,6 +119,7 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
             if is_from_claimsco:
                 record.who = "Complainant"
                 record.what = "ClaimsCo Letter to IDR"
+                record.entity = "ClaimsCo"
             else:
                 record.who = "FF"
 
@@ -130,6 +132,10 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
         "claimsco" in top_right
         or any(phrase in page1_normalized for phrase in claimsco_authorship_phrases)
     )
+
+    # If authored by ClaimsCo, set entity to ClaimsCo (logo may be image-only)
+    if is_from_claimsco and record.entity != "ClaimsCo":
+        record.entity = "ClaimsCo"
 
     # These document types are always complainant-side regardless of issuer
     complainant_doc_types = [
