@@ -67,12 +67,23 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
     what_lower = record.what.lower() if record.what else ""
 
     # Detect if the document is authored BY ClaimsCo:
-    # - ClaimsCo logo in the letterhead (top ~500 chars of page 1), OR
-    # - ClaimsCo detected as the entity (from entity inference)
-    # This avoids false positives from insurer letters that merely mention ClaimsCo.
-    page1_top = record.page1_text[:500].lower() if record.page1_text else ""
+    # ClaimsCo documents have the logo at the top of page 1 and/or a
+    # signature block at the bottom.  Insurer IDR responses may mention
+    # "ClaimsCo" in the *body* text (e.g. "Dear ClaimsCo"), so we only
+    # check the header area (first 1000 chars) and footer/signature area
+    # (last 500 chars) of page 1, not the middle body text.
+    # PDF text extraction order varies (a right-side logo can appear after
+    # left-side address text), so we use a generous header window.
+    page1 = record.page1_text or ""
+    page1_lower = page1.lower()
+    page1_header = page1_lower[:1000]
+    page1_footer = page1_lower[-500:] if len(page1_lower) > 500 else ""
     entity_lower = record.entity.lower() if record.entity else ""
-    is_from_claimsco = "claimsco" in page1_top or "claimsco" in entity_lower
+    is_from_claimsco = (
+        "claimsco" in page1_header
+        or "claimsco" in page1_footer
+        or "claimsco" in entity_lower
+    )
 
     # IDR/FDL documents are from the Financial Firm — UNLESS authored by
     # ClaimsCo (who writes to the insurer's IDR team on behalf of the

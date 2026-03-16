@@ -66,7 +66,7 @@ DEFAULT_SETTINGS = {
             "gio", "nrma", "bupa", "medibank", "nib",
             "budget direct", "racv", "racq"
         ],
-        "complainant_entities": ["ACB", "AusCoast", "RUCA", "Balmoral", "Patcol"],
+        "complainant_entities": ["ClaimsCo", "ACB", "AusCoast", "RUCA", "Balmoral", "Patcol"],
         "ff_entities": [
             "Sedgwick", "Campbell Constructions", "Morse Building Consultants",
             "QBE", "WeatherWatch", "BoM",
@@ -185,12 +185,15 @@ DEFAULT_SETTINGS = {
         "CoverMore": "Cover-More",
         "RCC National Pty Ltd": "RCC National",
         "RCC National Pty": "RCC National",
-        "RCC": "RCC National"
+        "RCC": "RCC National",
+        "Claims Made Easy": "ClaimsCo",
+        "CLAIMS MADE EASY": "ClaimsCo"
     },
     "preferred_entities": [
-        "Campbell Constructions", "Sedgwick", "Morse Building Consultants",
-        "RCC National", "QBE", "AFCA", "ACB", "AusCoast", "RUCA",
-        "Balmoral", "Patcol", "WeatherWatch", "BoM", "COI"
+        "ClaimsCo", "Campbell Constructions", "Sedgwick",
+        "Morse Building Consultants", "RCC National", "QBE", "AFCA",
+        "ACB", "AusCoast", "RUCA", "Balmoral", "Patcol",
+        "WeatherWatch", "BoM", "COI"
     ],
     "preferred_doc_labels": [
         "Site Report", "Photo Schedule", "Assessment Report",
