@@ -83,37 +83,43 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
     mapping = settings.get("who_mapping", {})
     ff_ents = [e.lower() for e in mapping.get("ff_entities", [])]
 
-    # IDR/FDL documents: determine authorship by checking for ClaimsCo
-    # authorship phrases FIRST (definitive — an insurer's IDR FDL would
-    # never say "on behalf of our mutual client"), then fall back to
-    # spatial layout.  We check phrases first because ClaimsCo's logo is
-    # often an image (not OCR-extractable), and the addressee text (e.g.
-    # "Allianz Insurance") can end up in the top-right region depending
-    # on the letter layout.
+    # IDR/FDL documents: determine authorship using spatial layout.
+    # Key insight: in letter format, top-right = FROM (letterhead),
+    # top-left = TO (addressee).
+    #   - If top-right has an FF entity → FROM the insurer → IDR FDL
+    #   - If top-left has an FF entity but top-right does NOT → the
+    #     letter is addressed TO the insurer → ClaimsCo Letter to IDR
+    #   - Fallback: check ClaimsCo authorship phrases in body text
     ff_doc_types = ["idr fdl", "idr", "final decision letter"]
     if any(dt in what_lower for dt in ff_doc_types):
-        claimsco_authorship_phrases = [
-            "on behalf of our mutual client",
-            "claims made easy",
-        ]
-        # DEBUG: temporary print to diagnose ClaimsCo detection
-        print(f"[DEBUG IDR CHECK] file={record.original_filename}")
-        print(f"  what_lower={what_lower!r}")
-        print(f"  top_right={top_right!r}")
-        print(f"  'claimsco' in top_right = {'claimsco' in top_right}")
-        for phrase in claimsco_authorship_phrases:
-            print(f"  {phrase!r} in page1_normalized = {phrase in page1_normalized}")
-        print(f"  page1_normalized[:500]={page1_normalized[:500]!r}")
-        is_from_claimsco = (
-            "claimsco" in top_right
-            or any(phrase in page1_normalized for phrase in claimsco_authorship_phrases)
-        )
-        print(f"  is_from_claimsco={is_from_claimsco}")
-        if is_from_claimsco:
+        top_left = regions.get("top_left", "").lower()
+        from_has_ff = any(ent in top_right for ent in ff_ents)
+        to_has_ff = any(ent in top_left for ent in ff_ents)
+
+        if from_has_ff:
+            # Letterhead is an insurer → this IS the insurer's IDR FDL
+            record.who = "FF"
+        elif to_has_ff and not from_has_ff:
+            # Addressed TO the insurer but FROM someone else →
+            # complainant-side letter (ClaimsCo Letter to IDR)
             record.who = "Complainant"
             record.what = "ClaimsCo Letter to IDR"
         else:
-            record.who = "FF"
+            # Fallback: check ClaimsCo authorship phrases
+            claimsco_authorship_phrases = [
+                "on behalf of our mutual client",
+                "claims made easy",
+            ]
+            is_from_claimsco = (
+                "claimsco" in top_right
+                or any(phrase in page1_normalized
+                       for phrase in claimsco_authorship_phrases)
+            )
+            if is_from_claimsco:
+                record.who = "Complainant"
+                record.what = "ClaimsCo Letter to IDR"
+            else:
+                record.who = "FF"
 
     # ClaimsCo-authored non-IDR documents: detect for WHO override
     claimsco_authorship_phrases = [

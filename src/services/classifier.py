@@ -39,14 +39,14 @@ def infer_who(page1_text: str, full_text: str, filename: str,
     ff_entities = [e.lower() for e in mapping.get("ff_entities", [])]
     afca_entities = [e.lower() for e in mapping.get("afca_entities", [])]
 
-    # --- Spatial layout: check the "from" region (top-right + bottom) ---
-    # In letter layout: top-right = letterhead/logo, bottom = signature.
-    # These identify who WROTE the document, which is the strongest signal.
+    # --- Spatial layout: check the "from" region (top-right only) ---
+    # In letter layout, the top-right contains the letterhead/logo which
+    # identifies who WROTE the document.  We intentionally exclude the
+    # bottom region because body text often bleeds into it (e.g. a
+    # ClaimsCo letter discussing Allianz's decision would have "Allianz"
+    # in the lower body, falsely triggering an FF match).
     if page1_regions:
-        from_text = (
-            page1_regions.get("top_right", "") + " "
-            + page1_regions.get("bottom", "")
-        ).lower()
+        from_text = page1_regions.get("top_right", "").lower()
         if from_text.strip():
             for ent in complainant_entities:
                 if ent in from_text:
