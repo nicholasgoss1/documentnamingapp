@@ -52,7 +52,8 @@ def infer_who(page1_text: str, full_text: str, filename: str,
     ff_score = sum(1 for kw in ff_kw if kw.lower() in text_lower)
 
     # ClaimsCo documents are always Complainant-side
-    if "claimsco" in text_lower:
+    # Check both the name and distinctive authorship phrases (logo may be an image)
+    if "claimsco" in text_lower or "on behalf of our mutual client" in text_lower:
         return "Complainant", 17
 
     # Complainant-side document types (check before AFCA)

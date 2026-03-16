@@ -74,15 +74,24 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
     # (last 500 chars) of page 1, not the middle body text.
     # PDF text extraction order varies (a right-side logo can appear after
     # left-side address text), so we use a generous header window.
+    # When the ClaimsCo logo is an image (not extractable text), we fall
+    # back to distinctive authorship phrases that only appear in letters
+    # written BY ClaimsCo on behalf of the complainant.
     page1 = record.page1_text or ""
     page1_lower = page1.lower()
     page1_header = page1_lower[:1000]
     page1_footer = page1_lower[-500:] if len(page1_lower) > 500 else ""
     entity_lower = record.entity.lower() if record.entity else ""
+    claimsco_authorship_phrases = [
+        "on behalf of our mutual client",
+        "claims made easy",
+        "delegation of authority for the above claim",
+    ]
     is_from_claimsco = (
         "claimsco" in page1_header
         or "claimsco" in page1_footer
         or "claimsco" in entity_lower
+        or any(phrase in page1_lower for phrase in claimsco_authorship_phrases)
     )
 
     # IDR/FDL documents are from the Financial Firm — UNLESS authored by
