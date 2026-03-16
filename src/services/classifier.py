@@ -20,9 +20,13 @@ def detect_annexure(filename: str) -> Tuple[bool, str]:
 
 
 def infer_who(page1_text: str, full_text: str, filename: str,
-              entity: str, settings: Settings) -> Tuple[str, int]:
+              entity: str, settings: Settings,
+              page1_regions: dict = None) -> Tuple[str, int]:
     """
     Infer the WHO field based on provenance rules.
+    Uses spatial layout when available: entities/keywords in the "from"
+    regions (top-right letterhead + bottom signature) indicate the author,
+    while the top-left region is the addressee.
     Returns (who_string, confidence_contribution 0-20).
     """
     text_lower = (page1_text + " " + full_text + " " + filename).lower()
@@ -33,7 +37,26 @@ def infer_who(page1_text: str, full_text: str, filename: str,
     ff_entities = [e.lower() for e in mapping.get("ff_entities", [])]
     afca_entities = [e.lower() for e in mapping.get("afca_entities", [])]
 
-    # Check entity first (most reliable)
+    # --- Spatial layout: check the "from" region (top-right + bottom) ---
+    # In letter layout: top-right = letterhead/logo, bottom = signature.
+    # These identify who WROTE the document, which is the strongest signal.
+    if page1_regions:
+        from_text = (
+            page1_regions.get("top_right", "") + " "
+            + page1_regions.get("bottom", "")
+        ).lower()
+        if from_text.strip():
+            for ent in complainant_entities:
+                if ent in from_text:
+                    return "Complainant", 19
+            for ent in afca_entities:
+                if ent in from_text:
+                    return "AFCA", 19
+            for ent in ff_entities:
+                if ent in from_text:
+                    return "FF", 19
+
+    # Check entity first (most reliable after spatial)
     if entity_lower:
         if entity_lower in complainant_entities:
             return "Complainant", 18
@@ -96,13 +119,26 @@ def infer_who(page1_text: str, full_text: str, filename: str,
     return "FF", 6
 
 
+def _find_entities_in_text(text: str, sorted_keys: list, search_map: dict) -> list:
+    """Find all known entities in a text string. Returns list of (canonical_name, position)."""
+    text_lower = text.lower()
+    found = []
+    for key in sorted_keys:
+        if key in text_lower:
+            canonical = search_map[key]
+            if canonical not in [f[0] for f in found]:
+                pos = text_lower.index(key)
+                found.append((canonical, pos))
+    return found
+
+
 def infer_entity(page1_text: str, full_text: str, filename: str,
-                 settings: Settings) -> Tuple[str, int]:
+                 settings: Settings, page1_regions: dict = None) -> Tuple[str, int]:
     """
     Infer the ENTITY field by looking for known entities.
-    Prioritises the letterhead / header area of page 1 (top ~600 chars)
-    because that's where logos and company names appear.  Falls back to
-    the rest of the text if nothing is found in the header.
+    Uses spatial layout when available: top-right region (letterhead/logo)
+    is the strongest signal for document authorship, followed by the
+    full header area.  The top-left region (addressee) is deprioritised.
     Returns (entity_string, confidence_contribution 0-20).
     """
     preferred = settings.get("preferred_entities", [])
@@ -117,15 +153,18 @@ def infer_entity(page1_text: str, full_text: str, filename: str,
 
     sorted_keys = sorted(search_map.keys(), key=len, reverse=True)
 
+    # Phase 0: spatial layout — top-right region (letterhead / "from" party)
+    if page1_regions:
+        top_right = page1_regions.get("top_right", "")
+        if top_right:
+            found = _find_entities_in_text(top_right, sorted_keys, search_map)
+            if found:
+                found.sort(key=lambda x: x[1])
+                return found[0][0], 20
+
     # Phase 1: search the header / letterhead area of page 1 only
     header_text = (page1_text[:600] if page1_text else "").lower()
-    header_found = []
-    for key in sorted_keys:
-        if key in header_text:
-            canonical = search_map[key]
-            if canonical not in [f[0] for f in header_found]:
-                pos = header_text.index(key)
-                header_found.append((canonical, pos))
+    header_found = _find_entities_in_text(header_text, sorted_keys, search_map)
 
     if header_found:
         header_found.sort(key=lambda x: x[1])
@@ -133,13 +172,7 @@ def infer_entity(page1_text: str, full_text: str, filename: str,
 
     # Phase 2: search the full page 1 text
     page1_lower = (page1_text or "").lower()
-    page1_found = []
-    for key in sorted_keys:
-        if key in page1_lower:
-            canonical = search_map[key]
-            if canonical not in [f[0] for f in page1_found]:
-                pos = page1_lower.index(key)
-                page1_found.append((canonical, pos))
+    page1_found = _find_entities_in_text(page1_lower, sorted_keys, search_map)
 
     if page1_found:
         page1_found.sort(key=lambda x: x[1])
@@ -147,13 +180,7 @@ def infer_entity(page1_text: str, full_text: str, filename: str,
 
     # Phase 3: fall back to full text + filename
     text = (full_text + " " + filename).lower()
-    fallback_found = []
-    for key in sorted_keys:
-        if key in text:
-            canonical = search_map[key]
-            if canonical not in [f[0] for f in fallback_found]:
-                pos = text.index(key)
-                fallback_found.append((canonical, pos))
+    fallback_found = _find_entities_in_text(text, sorted_keys, search_map)
 
     if fallback_found:
         fallback_found.sort(key=lambda x: x[1])

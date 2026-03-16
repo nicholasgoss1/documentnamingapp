@@ -47,14 +47,15 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
     # Infer ENTITY first (used by WHO inference)
     entity, entity_conf = infer_entity(
         record.page1_text, record.extracted_text,
-        record.original_filename, settings
+        record.original_filename, settings, record.page1_regions
     )
     record.entity = normalize_entity(entity, settings)
 
     # Infer WHO
     who, who_conf = infer_who(
         record.page1_text, record.extracted_text,
-        record.original_filename, record.entity, settings
+        record.original_filename, record.entity, settings,
+        record.page1_regions
     )
     record.who = normalize_who(who)
 
