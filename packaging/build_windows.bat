@@ -2,9 +2,13 @@
 REM Build script for Claim File Renamer on Windows 11
 REM Prerequisites: Python 3.12+, pip, Inno Setup (optional for installer)
 
+REM Ensure working directory is the project root (parent of packaging\)
+cd /d "%~dp0.."
+
 echo ============================================
 echo  Claim File Renamer - Build Script
 echo ============================================
+echo Working directory: %CD%
 echo.
 
 REM Step 1: Create virtual environment
