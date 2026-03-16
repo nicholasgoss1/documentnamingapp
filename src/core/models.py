@@ -89,6 +89,7 @@ class DocumentRecord:
     page1_text: str = ""
     file_hash: str = ""
     content_hash: str = ""
+    page1_regions: dict = field(default_factory=dict)
     annexure_number: str = ""
     annexure_stripped: bool = False
     is_unsure: bool = False

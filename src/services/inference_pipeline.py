@@ -8,7 +8,8 @@ from typing import List, Callable, Optional
 from src.core.models import DocumentRecord, DuplicateStatus
 from src.core.settings import Settings
 from src.services.pdf_extractor import (
-    extract_text, extract_page1_text, compute_file_hash, compute_content_hash
+    extract_text, extract_page1_text, extract_page1_spatial,
+    compute_file_hash, compute_content_hash
 )
 from src.services.classifier import (
     detect_annexure, infer_who, infer_entity, infer_what,
@@ -37,6 +38,7 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
     # Extract text
     record.page1_text = extract_page1_text(file_path)
     record.extracted_text = extract_text(file_path, max_pages=5)
+    record.page1_regions = extract_page1_spatial(file_path)
 
     # Compute hashes
     record.file_hash = compute_file_hash(file_path)
@@ -66,21 +68,17 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
     # Document-type-based WHO overrides
     what_lower = record.what.lower() if record.what else ""
 
-    # Detect if the document is authored BY ClaimsCo:
-    # ClaimsCo documents have the logo at the top of page 1 and/or a
-    # signature block at the bottom.  Insurer IDR responses may mention
-    # "ClaimsCo" in the *body* text (e.g. "Dear ClaimsCo"), so we only
-    # check the header area (first 1000 chars) and footer/signature area
-    # (last 500 chars) of page 1, not the middle body text.
-    # PDF text extraction order varies (a right-side logo can appear after
-    # left-side address text), so we use a generous header window.
-    # When the ClaimsCo logo is an image (not extractable text), we fall
-    # back to distinctive authorship phrases that only appear in letters
-    # written BY ClaimsCo on behalf of the complainant.
+    # Detect if the document is authored BY ClaimsCo using spatial layout:
+    # In standard letter layout, the top-right contains the "from" party
+    # (letterhead/logo) and the bottom contains the signature block.
+    # The top-left is the "to" party (addressee) — we must NOT treat
+    # entities found there as the author.
+    # We also check distinctive authorship phrases as a fallback when
+    # the ClaimsCo logo is an image and not extractable as text.
     page1 = record.page1_text or ""
     page1_lower = page1.lower()
-    page1_header = page1_lower[:1000]
-    page1_footer = page1_lower[-500:] if len(page1_lower) > 500 else ""
+    regions = record.page1_regions or {}
+    from_region = (regions.get("top_right", "") + "\n" + regions.get("bottom", "")).lower()
     entity_lower = record.entity.lower() if record.entity else ""
     claimsco_authorship_phrases = [
         "on behalf of our mutual client",
@@ -88,8 +86,7 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
         "delegation of authority for the above claim",
     ]
     is_from_claimsco = (
-        "claimsco" in page1_header
-        or "claimsco" in page1_footer
+        "claimsco" in from_region
         or "claimsco" in entity_lower
         or any(phrase in page1_lower for phrase in claimsco_authorship_phrases)
     )
