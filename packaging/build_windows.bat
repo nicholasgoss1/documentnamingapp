@@ -29,10 +29,21 @@ echo ============================================
 echo.
 
 REM Step 4: Build installer (optional)
+set ISCC_PATH=
 where iscc >nul 2>nul
 if %ERRORLEVEL% EQU 0 (
+    set ISCC_PATH=iscc
+) else if exist "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" (
+    set "ISCC_PATH=%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
+) else if exist "%ProgramFiles%\Inno Setup 6\ISCC.exe" (
+    set "ISCC_PATH=%ProgramFiles%\Inno Setup 6\ISCC.exe"
+) else if exist "%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe" (
+    set "ISCC_PATH=%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe"
+)
+
+if defined ISCC_PATH (
     echo [4/4] Building installer with Inno Setup...
-    iscc packaging\installer.iss
+    "%ISCC_PATH%" packaging\installer.iss
     echo.
     echo Installer created: installer_output\ClaimFileRenamer_Setup_1.0.0.exe
 ) else (
