@@ -98,12 +98,14 @@ def infer_who(page1_text: str, full_text: str, filename: str,
 def infer_entity(page1_text: str, full_text: str, filename: str,
                  settings: Settings) -> Tuple[str, int]:
     """
-    Infer the ENTITY field.
+    Infer the ENTITY field by looking for known entities.
+    Prioritises the letterhead / header area of page 1 (top ~600 chars)
+    because that's where logos and company names appear.  Falls back to
+    the rest of the text if nothing is found in the header.
     Returns (entity_string, confidence_contribution 0-20).
     """
     preferred = settings.get("preferred_entities", [])
     aliases = settings.get("entity_aliases", {})
-    text = page1_text + " " + full_text + " " + filename
 
     # Build a search map: all preferred entities + their aliases
     search_map = {}
@@ -112,20 +114,49 @@ def infer_entity(page1_text: str, full_text: str, filename: str,
     for alias, canonical in aliases.items():
         search_map[alias.lower()] = canonical
 
-    # Search for entities, longest match first
-    found = []
-    for key in sorted(search_map.keys(), key=len, reverse=True):
-        if key in text.lower():
-            canonical = search_map[key]
-            if canonical not in [f[0] for f in found]:
-                # Find the position for priority
-                pos = text.lower().index(key)
-                found.append((canonical, pos))
+    sorted_keys = sorted(search_map.keys(), key=len, reverse=True)
 
-    if found:
-        # Return the one that appears earliest / most prominent
-        found.sort(key=lambda x: x[1])
-        return found[0][0], 15
+    # Phase 1: search the header / letterhead area of page 1 only
+    header_text = (page1_text[:600] if page1_text else "").lower()
+    header_found = []
+    for key in sorted_keys:
+        if key in header_text:
+            canonical = search_map[key]
+            if canonical not in [f[0] for f in header_found]:
+                pos = header_text.index(key)
+                header_found.append((canonical, pos))
+
+    if header_found:
+        header_found.sort(key=lambda x: x[1])
+        return header_found[0][0], 20
+
+    # Phase 2: search the full page 1 text
+    page1_lower = (page1_text or "").lower()
+    page1_found = []
+    for key in sorted_keys:
+        if key in page1_lower:
+            canonical = search_map[key]
+            if canonical not in [f[0] for f in page1_found]:
+                pos = page1_lower.index(key)
+                page1_found.append((canonical, pos))
+
+    if page1_found:
+        page1_found.sort(key=lambda x: x[1])
+        return page1_found[0][0], 15
+
+    # Phase 3: fall back to full text + filename
+    text = (full_text + " " + filename).lower()
+    fallback_found = []
+    for key in sorted_keys:
+        if key in text:
+            canonical = search_map[key]
+            if canonical not in [f[0] for f in fallback_found]:
+                pos = text.index(key)
+                fallback_found.append((canonical, pos))
+
+    if fallback_found:
+        fallback_found.sort(key=lambda x: x[1])
+        return fallback_found[0][0], 10
 
     return "", 0
 

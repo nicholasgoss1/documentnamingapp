@@ -80,6 +80,28 @@ class TestEntityInference(unittest.TestCase):
         )
         self.assertEqual(entity, "Campbell Constructions")
 
+    def test_header_priority_over_body(self):
+        """Entity in the letterhead area takes priority over one in the body."""
+        # RCC National in header, Allianz in body further down
+        page1 = (
+            "RCC National Pty Ltd\n"
+            "Head Office: 38 Arden Street\n"
+            "Building Assessment - Report\n"
+            "Claim Number: 6210452572\n"
+            "Customer Details:\n"
+            "INSURER: Allianz Australia Insurance Ltd\n"
+        )
+        entity, conf = infer_entity(page1, "", "report.pdf", self.settings)
+        self.assertEqual(entity, "RCC National")
+        self.assertEqual(conf, 20)  # header match gets highest confidence
+
+    def test_rcc_national(self):
+        entity, conf = infer_entity(
+            "RCC National Pty Ltd\nSite Report", "", "rcc_report.pdf",
+            self.settings
+        )
+        self.assertEqual(entity, "RCC National")
+
 
 class TestWhatInference(unittest.TestCase):
 

@@ -182,12 +182,15 @@ DEFAULT_SETTINGS = {
         "OnePath Insurance": "OnePath",
         "Resolution Life Australasia": "Resolution Life",
         "Cover More": "Cover-More",
-        "CoverMore": "Cover-More"
+        "CoverMore": "Cover-More",
+        "RCC National Pty Ltd": "RCC National",
+        "RCC National Pty": "RCC National",
+        "RCC": "RCC National"
     },
     "preferred_entities": [
         "Campbell Constructions", "Sedgwick", "Morse Building Consultants",
-        "QBE", "AFCA", "ACB", "AusCoast", "RUCA", "Balmoral", "Patcol",
-        "WeatherWatch", "BoM", "COI"
+        "RCC National", "QBE", "AFCA", "ACB", "AusCoast", "RUCA",
+        "Balmoral", "Patcol", "WeatherWatch", "BoM", "COI"
     ],
     "preferred_doc_labels": [
         "Site Report", "Photo Schedule", "Assessment Report",
