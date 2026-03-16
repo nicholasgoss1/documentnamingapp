@@ -187,7 +187,8 @@ DEFAULT_SETTINGS = {
         "RCC National Pty": "RCC National",
         "RCC": "RCC National",
         "Claims Made Easy": "ClaimsCo",
-        "CLAIMS MADE EASY": "ClaimsCo"
+        "CLAIMS MADE EASY": "ClaimsCo",
+        "claimsco.com.au": "ClaimsCo"
     },
     "preferred_entities": [
         "ClaimsCo", "Campbell Constructions", "Sedgwick",

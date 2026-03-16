@@ -164,6 +164,30 @@ def infer_entity(page1_text: str, full_text: str, filename: str,
                 found.sort(key=lambda x: x[1])
                 return found[0][0], 20
 
+    # Phase 0.5: signature / sign-off area — strong authorship signal.
+    # Check the bottom region of page 1 and the last portion of the full
+    # document text (signature block on the final page).
+    sig_texts = []
+    if page1_regions:
+        bottom = page1_regions.get("bottom", "")
+        if bottom:
+            sig_texts.append(bottom)
+    if full_text:
+        sig_texts.append(full_text[-800:])
+    for sig_text in sig_texts:
+        sig_found = _find_entities_in_text(sig_text, sorted_keys, search_map)
+        if sig_found:
+            # Prefer complainant-side entities in signature (the author)
+            complainant_ents = set(
+                e.lower() for e in settings.get("who_mapping", {}).get(
+                    "complainant_entities", []))
+            for entity, pos in sig_found:
+                if entity.lower() in complainant_ents:
+                    return entity, 20
+            # Otherwise use the first entity found in the signature
+            sig_found.sort(key=lambda x: x[1])
+            return sig_found[0][0], 18
+
     # Phase 1: search the header / letterhead area of page 1 only
     header_text = (page1_text[:600] if page1_text else "").lower()
     header_found = _find_entities_in_text(header_text, sorted_keys, search_map)

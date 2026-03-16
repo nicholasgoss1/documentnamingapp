@@ -110,6 +110,7 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
             claimsco_authorship_phrases = [
                 "on behalf of our mutual client",
                 "claims made easy",
+                "desired outcome",
             ]
             is_from_claimsco = (
                 "claimsco" in top_right
@@ -127,6 +128,7 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
     claimsco_authorship_phrases = [
         "on behalf of our mutual client",
         "claims made easy",
+        "desired outcome",
     ]
     is_from_claimsco = (
         "claimsco" in top_right
