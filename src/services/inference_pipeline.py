@@ -36,7 +36,7 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
 
     # Extract text
     record.page1_text = extract_page1_text(file_path)
-    record.extracted_text = extract_text(file_path, max_pages=5)
+    record.extracted_text = extract_text(file_path, max_pages=10)
 
     # Compute hashes
     record.file_hash = compute_file_hash(file_path)
