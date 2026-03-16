@@ -36,7 +36,7 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
 
     # Extract text
     record.page1_text = extract_page1_text(file_path)
-    record.extracted_text = extract_text(file_path, max_pages=10)
+    record.extracted_text = extract_text(file_path, max_pages=5)
 
     # Compute hashes
     record.file_hash = compute_file_hash(file_path)
@@ -70,7 +70,7 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
 
     # IDR/FDL documents are from the Financial Firm — UNLESS the document
     # is from ClaimsCo (who writes to the insurer's IDR team on behalf of
-    # the complainant, identifiable by ClaimsCo logo/signature/letterhead).
+    # the complainant, identifiable by either ClaimsCo logo or signature).
     ff_doc_types = ["idr fdl", "idr", "final decision letter"]
     if any(dt in what_lower for dt in ff_doc_types) and not is_claimsco:
         record.who = "FF"
