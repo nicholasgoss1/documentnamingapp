@@ -186,6 +186,16 @@ def infer_date(doc_type: str, page1_text: str, full_text: str,
         date, _ = find_page1_top_date(page1_text)
         if date:
             return date, 10
+        # Fallback: search the last portion of the document (signature area,
+        # e.g. client signed on page 4) — take the LAST date found
+        tail_text = full_text[-3000:] if len(full_text) > 3000 else full_text
+        tail_dates = extract_all_dates(tail_text)
+        if tail_dates:
+            return tail_dates[-1][0], 12
+        # Still nothing — try any date in full text
+        all_dates = extract_all_dates(full_text)
+        if all_dates:
+            return all_dates[-1][0], 8
         return "NO DATE", 5
 
     # 3. Policy schedule / COI

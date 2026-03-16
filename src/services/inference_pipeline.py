@@ -65,11 +65,17 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
 
     # Document-type-based WHO overrides
     what_lower = record.what.lower() if record.what else ""
+    text_lower = (record.page1_text + " " + record.extracted_text).lower()
+    is_claimsco = "claimsco" in text_lower
 
-    # IDR/FDL documents are always from the Financial Firm
+    # IDR/FDL documents are from the Financial Firm — UNLESS the document
+    # is from ClaimsCo (who writes to the insurer's IDR team on behalf of
+    # the complainant, identifiable by ClaimsCo logo/signature/letterhead).
     ff_doc_types = ["idr fdl", "idr", "final decision letter"]
-    if any(dt in what_lower for dt in ff_doc_types):
+    if any(dt in what_lower for dt in ff_doc_types) and not is_claimsco:
         record.who = "FF"
+    elif any(dt in what_lower for dt in ff_doc_types) and is_claimsco:
+        record.who = "Complainant"
 
     # These document types are always complainant-side regardless of issuer
     complainant_doc_types = [

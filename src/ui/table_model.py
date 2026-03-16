@@ -7,6 +7,7 @@ from PySide6.QtCore import Qt, QAbstractTableModel, QModelIndex
 from PySide6.QtGui import QColor
 
 from src.core.models import DocumentRecord, RenameStatus, DuplicateStatus
+from src.services.duplicate_detector import _append_duplicate
 
 COLUMNS = [
     "Original Filename",
@@ -22,6 +23,14 @@ COLUMNS = [
 ]
 
 EDITABLE_COLUMNS = {1, 2, 3, 4}  # WHO, DATE, ENTITY, WHAT
+
+
+def _rebuild_filename(rec: DocumentRecord):
+    """Rebuild proposed filename, preserving DUPLICATE suffix if applicable."""
+    rec.proposed_filename = rec.build_proposed_filename()
+    if rec.duplicate_status not in (DuplicateStatus.NONE, None):
+        if " - DUPLICATE" not in rec.proposed_filename:
+            rec.proposed_filename = _append_duplicate(rec.proposed_filename)
 
 
 class DocumentTableModel(QAbstractTableModel):
@@ -137,8 +146,8 @@ class DocumentTableModel(QAbstractTableModel):
         else:
             return False
 
-        # Rebuild proposed filename
-        rec.proposed_filename = rec.build_proposed_filename()
+        # Rebuild proposed filename (preserving DUPLICATE suffix)
+        _rebuild_filename(rec)
         # Emit change for the whole row
         self.dataChanged.emit(
             self.index(row, 0),
@@ -173,7 +182,7 @@ class DocumentTableModel(QAbstractTableModel):
                     rec.entity = value
                 elif col == 4:
                     rec.what = value
-                rec.proposed_filename = rec.build_proposed_filename()
+                _rebuild_filename(rec)
         if rows:
             self.dataChanged.emit(
                 self.index(min(rows), 0),
@@ -187,7 +196,7 @@ class DocumentTableModel(QAbstractTableModel):
                 rec = self._records[row]
                 if find.lower() in rec.what.lower():
                     rec.what = rec.what.replace(find, replace)
-                    rec.proposed_filename = rec.build_proposed_filename()
+                    _rebuild_filename(rec)
         if rows:
             self.dataChanged.emit(
                 self.index(min(rows), 0),
