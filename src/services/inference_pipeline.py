@@ -96,10 +96,19 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
             "on behalf of our mutual client",
             "claims made easy",
         ]
+        # DEBUG: temporary print to diagnose ClaimsCo detection
+        print(f"[DEBUG IDR CHECK] file={record.original_filename}")
+        print(f"  what_lower={what_lower!r}")
+        print(f"  top_right={top_right!r}")
+        print(f"  'claimsco' in top_right = {'claimsco' in top_right}")
+        for phrase in claimsco_authorship_phrases:
+            print(f"  {phrase!r} in page1_normalized = {phrase in page1_normalized}")
+        print(f"  page1_normalized[:500]={page1_normalized[:500]!r}")
         is_from_claimsco = (
             "claimsco" in top_right
             or any(phrase in page1_normalized for phrase in claimsco_authorship_phrases)
         )
+        print(f"  is_from_claimsco={is_from_claimsco}")
         if is_from_claimsco:
             record.who = "Complainant"
             record.what = "ClaimsCo Letter to IDR"
