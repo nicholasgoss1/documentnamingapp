@@ -3,6 +3,7 @@ Main inference pipeline that orchestrates all engines.
 Processes a list of PDF files and produces DocumentRecords.
 """
 import os
+import re
 from typing import List, Callable, Optional
 
 from src.core.models import DocumentRecord, DuplicateStatus
@@ -72,6 +73,9 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
     # Spatial layout regions for letter-format documents.
     page1 = record.page1_text or ""
     page1_lower = page1.lower()
+    # Normalize whitespace for phrase matching — PDF extraction preserves
+    # line breaks within paragraphs which splits phrases across lines.
+    page1_normalized = re.sub(r'\s+', ' ', page1_lower)
     regions = record.page1_regions or {}
     top_right = regions.get("top_right", "").lower()
 
@@ -99,7 +103,7 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
             ]
             is_from_claimsco = (
                 "claimsco" in top_right
-                or any(phrase in page1_lower for phrase in claimsco_authorship_phrases)
+                or any(phrase in page1_normalized for phrase in claimsco_authorship_phrases)
             )
             if is_from_claimsco:
                 record.who = "Complainant"
@@ -114,7 +118,7 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
     ]
     is_from_claimsco = (
         "claimsco" in top_right
-        or any(phrase in page1_lower for phrase in claimsco_authorship_phrases)
+        or any(phrase in page1_normalized for phrase in claimsco_authorship_phrases)
     )
 
     # These document types are always complainant-side regardless of issuer

@@ -30,6 +30,8 @@ def infer_who(page1_text: str, full_text: str, filename: str,
     Returns (who_string, confidence_contribution 0-20).
     """
     text_lower = (page1_text + " " + full_text + " " + filename).lower()
+    # Normalize whitespace for phrase matching — PDF line breaks split phrases
+    text_normalized = re.sub(r'\s+', ' ', text_lower)
     entity_lower = entity.lower() if entity else ""
     mapping = settings.get("who_mapping", {})
 
@@ -76,7 +78,7 @@ def infer_who(page1_text: str, full_text: str, filename: str,
 
     # ClaimsCo documents are always Complainant-side
     # Check both the name and distinctive authorship phrases (logo may be an image)
-    if "claimsco" in text_lower or "on behalf of our mutual client" in text_lower:
+    if "claimsco" in text_lower or "on behalf of our mutual client" in text_normalized:
         return "Complainant", 17
 
     # Complainant-side document types (check before AFCA)
