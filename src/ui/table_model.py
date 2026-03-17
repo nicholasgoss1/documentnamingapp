@@ -96,6 +96,8 @@ class DocumentTableModel(QAbstractTableModel):
             elif col == 8:
                 return rec.duplicate_status.value if rec.duplicate_status else ""
             elif col == 9:
+                if rec.rename_status == RenameStatus.ERROR and rec.error_message:
+                    return f"Error: {rec.error_message}"
                 return rec.rename_status.value if rec.rename_status else ""
 
         elif role == Qt.BackgroundRole:

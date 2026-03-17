@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QMenu, QMenuBar, QToolBar
 )
 
-from src.core.settings import Settings
+from src.core.settings import Settings, APP_VERSION
 from src.core.models import DocumentRecord, RenameStatus
 from src.ui.table_model import DocumentTableModel
 from src.ui.filter_proxy import DocumentFilterProxy
@@ -35,7 +35,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.settings = settings
         self._worker = None
-        self.setWindowTitle("Claim File Renamer v1.0.0")
+        self.setWindowTitle(f"Claim File Renamer v{APP_VERSION}")
         self.setMinimumSize(1280, 720)
         self.setAcceptDrops(True)
 

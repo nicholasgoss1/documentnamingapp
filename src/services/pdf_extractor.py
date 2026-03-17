@@ -23,59 +23,68 @@ def _clean_text(text: str) -> str:
 
 def extract_text(file_path: str, max_pages: int = 5) -> str:
     """Extract text from the first N pages of a PDF."""
+    doc = None
     try:
         doc = fitz.open(file_path)
         text_parts = []
         for i in range(min(max_pages, len(doc))):
             page = doc[i]
             text_parts.append(page.get_text("text"))
-        doc.close()
         return _clean_text("\n".join(text_parts))
     except Exception:
         return ""
+    finally:
+        if doc:
+            doc.close()
 
 
 def extract_page1_text(file_path: str) -> str:
     """Extract text from page 1 only."""
+    doc = None
     try:
         doc = fitz.open(file_path)
         if len(doc) > 0:
             text = doc[0].get_text("text")
         else:
             text = ""
-        doc.close()
         return _clean_text(text)
     except Exception:
         return ""
+    finally:
+        if doc:
+            doc.close()
 
 
 def get_page_count(file_path: str) -> int:
     """Return number of pages."""
+    doc = None
     try:
         doc = fitz.open(file_path)
-        count = len(doc)
-        doc.close()
-        return count
+        return len(doc)
     except Exception:
         return 0
+    finally:
+        if doc:
+            doc.close()
 
 
 def render_page_pixmap(file_path: str, page_num: int = 0,
                        zoom: float = 1.5) -> Optional[bytes]:
     """Render a page to PNG bytes for preview."""
+    doc = None
     try:
         doc = fitz.open(file_path)
         if page_num >= len(doc):
-            doc.close()
             return None
         page = doc[page_num]
         mat = fitz.Matrix(zoom, zoom)
         pix = page.get_pixmap(matrix=mat)
-        png_bytes = pix.tobytes("png")
-        doc.close()
-        return png_bytes
+        return pix.tobytes("png")
     except Exception:
         return None
+    finally:
+        if doc:
+            doc.close()
 
 
 def extract_page1_spatial(file_path: str) -> dict:
@@ -93,10 +102,10 @@ def extract_page1_spatial(file_path: str) -> dict:
     Each value is a string of the text blocks in that region.
     """
     regions = {"top_left": "", "top_right": "", "top": "", "body": "", "bottom": ""}
+    doc = None
     try:
         doc = fitz.open(file_path)
         if len(doc) == 0:
-            doc.close()
             return regions
         page = doc[0]
         width = page.rect.width
@@ -108,7 +117,6 @@ def extract_page1_spatial(file_path: str) -> dict:
         mid_x = width * 0.5
 
         blocks = page.get_text("blocks")  # list of (x0, y0, x1, y1, text, block_no, block_type)
-        doc.close()
 
         top_left_parts = []
         top_right_parts = []
@@ -145,6 +153,9 @@ def extract_page1_spatial(file_path: str) -> dict:
         regions["bottom"] = "\n".join(bottom_parts)
     except Exception:
         pass
+    finally:
+        if doc:
+            doc.close()
     return regions
 
 

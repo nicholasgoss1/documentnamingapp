@@ -30,7 +30,7 @@ def main():
 
     app = QApplication(sys.argv)
     app.setApplicationName("Claim File Renamer")
-    app.setApplicationVersion("1.0.0")
+    app.setApplicationVersion("1.1.0")
     app.setOrganizationName("ClaimFileRenamer")
 
     # Set icon if available
