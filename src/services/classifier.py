@@ -373,17 +373,29 @@ def should_include_entity(doc_type: str, entity: str, settings: Settings) -> boo
 
 
 def extract_quote_amount(text: str) -> str:
-    """Try to extract a dollar amount from a quote document."""
-    patterns = [
-        r'\$\s*([\d,]+\.?\d*)',
-        r'total[:\s]*\$\s*([\d,]+\.?\d*)',
-        r'quote[:\s]*\$\s*([\d,]+\.?\d*)',
-        r'amount[:\s]*\$\s*([\d,]+\.?\d*)',
-    ]
-    for pat in patterns:
-        m = re.search(pat, text, re.IGNORECASE)
-        if m:
-            amount = m.group(1)
-            # Format with $ prefix
-            return f"${amount}"
+    """Try to extract the total dollar amount from a quote document.
+
+    Prefer amounts labelled 'total' (the grand total). If multiple totals
+    exist, use the last one (usually the grand total after sub-totals).
+    Falls back to the largest dollar amount found in the document.
+    """
+    # First: look for amounts explicitly labelled "total"
+    total_pattern = r'total[:\s]*\$\s*([\d,]+\.?\d*)'
+    total_matches = re.findall(total_pattern, text, re.IGNORECASE)
+    if total_matches:
+        # Last "total" amount is typically the grand total
+        amount = total_matches[-1]
+        return f"${amount}"
+
+    # Fallback: find all dollar amounts and return the largest
+    all_amounts = re.findall(r'\$\s*([\d,]+\.?\d*)', text)
+    if all_amounts:
+        def parse_amount(s):
+            try:
+                return float(s.replace(",", ""))
+            except ValueError:
+                return 0.0
+        best = max(all_amounts, key=parse_amount)
+        return f"${best}"
+
     return ""
