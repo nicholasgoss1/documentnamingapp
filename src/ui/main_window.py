@@ -5,7 +5,12 @@ import os
 from typing import List
 
 from PySide6.QtCore import Qt, QModelIndex
-from PySide6.QtGui import QAction, QDragEnterEvent, QDropEvent
+from PySide6.QtGui import QAction, QDragEnterEvent, QDropEvent, QPixmap
+try:
+    from PySide6.QtSvgWidgets import QSvgWidget
+    _HAS_SVG = True
+except ImportError:
+    _HAS_SVG = False
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QTableView, QLabel, QPushButton, QProgressBar, QLineEdit,
@@ -123,6 +128,15 @@ class MainWindow(QMainWindow):
             self._filter_checks[name] = cb
 
         top_bar.addWidget(filters_group, 3)
+
+        # ClaimsCo logo (top right)
+        logo_path = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "claimsco_logo.svg")
+        logo_path = os.path.normpath(logo_path)
+        if _HAS_SVG and os.path.exists(logo_path):
+            self._logo = QSvgWidget(logo_path)
+            self._logo.setFixedSize(165, 45)
+            top_bar.addWidget(self._logo, 0, Qt.AlignRight | Qt.AlignVCenter)
+
         main_layout.addLayout(top_bar)
 
         # Main splitter: table + preview
