@@ -43,10 +43,40 @@ class TestDateExtraction(unittest.TestCase):
         self.assertEqual(date, "25.06.2024")
         self.assertFalse(partial)
 
+    def test_two_digit_year(self):
+        dates = extract_all_dates("Date: 28/06/24")
+        self.assertEqual(len(dates), 1)
+        self.assertEqual(dates[0][0], "28.06.2024")
+
+    def test_two_digit_year_dot(self):
+        dates = extract_all_dates("Signed 15.03.25")
+        self.assertEqual(dates[0][0], "15.03.2025")
+
     def test_find_signed_date(self):
         text = "I agree to the terms.\n\nSigned: 23/02/2024\nName: John Smith"
         date = find_signed_date(text)
         self.assertEqual(date, "23.02.2024")
+
+    def test_find_signed_date_two_digit_year(self):
+        text = "I agree to the terms.\n\nSigned: 23/02/24\nName: John Smith"
+        date = find_signed_date(text)
+        self.assertEqual(date, "23.02.2024")
+
+    def test_find_signed_date_standalone_label(self):
+        """Standalone 'Date:' in signature block at end of document."""
+        text = (
+            "Scope of Claim content...\n" * 20
+            + "Signature: [signed]\nPrint name: Leah Heron\nDate: 28/06/24\n"
+        )
+        date = find_signed_date(text)
+        self.assertEqual(date, "28.06.2024")
+
+    def test_signed_type_uses_last_date(self):
+        """SIGNED_TYPES should prefer the last date (signature date near end)."""
+        page1 = "Scope of Claim\nDate issued: 02/07/2024\n\nContent..."
+        full = page1 + "\n" * 10 + "Signature\nDate: 28/06/24\n"
+        date, conf = infer_date("Letter of Engagement", page1, full, "loe.pdf")
+        self.assertEqual(date, "28.06.2024")
 
     def test_find_policy_inception(self):
         text = "Policy Schedule\nInception date: 15/11/2023\nExpiry: 15/11/2024"

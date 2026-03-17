@@ -4,14 +4,14 @@
 [Setup]
 AppId={{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}
 AppName=Claim File Renamer
-AppVersion=1.1.0
-AppVerName=Claim File Renamer 1.1.0
+AppVersion=1.2.0
+AppVerName=Claim File Renamer 1.2.0
 AppPublisher=ClaimFileRenamer
 DefaultDirName={autopf}\ClaimFileRenamer
 DefaultGroupName=Claim File Renamer
 DisableProgramGroupPage=yes
 OutputDir=..\installer_output
-OutputBaseFilename=ClaimFileRenamer_Setup_1.1.0
+OutputBaseFilename=ClaimFileRenamer_Setup_1.2.0
 SetupIconFile=..\assets\icon.ico
 Compression=lzma
 SolidCompression=yes

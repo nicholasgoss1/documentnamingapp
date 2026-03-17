@@ -14,6 +14,8 @@ _MONTHS_ALL = f"{_MONTHS_FULL}|{_MONTHS_ABBR}"
 DATE_PATTERNS = [
     # dd/mm/yyyy or dd.mm.yyyy or dd-mm-yyyy
     (r'\b(\d{1,2})[./\-](\d{1,2})[./\-](\d{4})\b', "dmy"),
+    # dd/mm/yy or dd.mm.yy or dd-mm-yy (2-digit year)
+    (r'\b(\d{1,2})[./\-](\d{1,2})[./\-](\d{2})\b', "dmy2"),
     # yyyy-mm-dd (ISO)
     (r'\b(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})\b', "ymd"),
     # Written dates: 11 April 2024, 11 Apr 2024, April 11, 2024, Apr 11, 2024
@@ -61,6 +63,13 @@ def parse_date(text: str, pattern_type: str, match) -> Tuple[str, bool]:
         if not _valid_date_parts(d, m, y):
             return "", False
         return f"{d:02d}.{m:02d}.{match.group(3)}", False
+    elif pattern_type == "dmy2":
+        d, m, yy = int(match.group(1)), int(match.group(2)), int(match.group(3))
+        # Convert 2-digit year: 00-49 → 2000-2049, 50-99 → 1950-1999
+        y = 2000 + yy if yy < 50 else 1900 + yy
+        if not _valid_date_parts(d, m, y):
+            return "", False
+        return f"{d:02d}.{m:02d}.{y}", False
     elif pattern_type == "ymd":
         y, m, d = int(match.group(1)), int(match.group(2)), int(match.group(3))
         if not _valid_date_parts(d, m, y):
@@ -112,8 +121,9 @@ def find_page1_top_date(page1_text: str) -> Tuple[str, bool]:
 def find_signed_date(text: str) -> str:
     """Look for a signature/execution date."""
     # Look for patterns like "Date signed:", "Signed:", "Executed:" near signature blocks
+    # Also match standalone "Date:" which is common in signature blocks
     patterns = [
-        r'(?:date\s+signed|signed|executed|date\s+of\s+signing)\s*[:.]?\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})',
+        r'(?:date\s+signed|signed|executed|date\s+of\s+signing)\s*[:.]?\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{2,4})',
         r'(?:date\s+signed|signed|executed|date\s+of\s+signing)\s*[:.]?\s*(\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4})',
     ]
     for pat in patterns:
@@ -123,6 +133,23 @@ def find_signed_date(text: str) -> str:
             sub_dates = extract_all_dates(m.group(0))
             if sub_dates:
                 return sub_dates[0][0]
+
+    # Check for standalone "Date:" in the last portion of the document
+    # (signature blocks are typically near the end)
+    tail = text[-1500:] if len(text) > 1500 else text
+    date_label_patterns = [
+        r'\bDate\s*[:.]?\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{2,4})',
+    ]
+    # Find the LAST "Date:" match in the tail (closest to signature)
+    last_match = None
+    for pat in date_label_patterns:
+        for m in re.finditer(pat, tail, re.IGNORECASE):
+            last_match = m
+    if last_match:
+        sub_dates = extract_all_dates(last_match.group(0))
+        if sub_dates:
+            return sub_dates[0][0]
+
     return ""
 
 

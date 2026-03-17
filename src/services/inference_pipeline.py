@@ -143,6 +143,22 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
         or any(phrase in page1_normalized for phrase in claimsco_authorship_phrases)
     )
 
+    # If authored by ClaimsCo and addressed to/about AFCA, it's a ClaimsCo Letter to IDR
+    # (catches cases like "AFCA Re-Lodgement" that mention "hail damage" in the body
+    #  and get misclassified as "Hail Report" by keyword matching)
+    if is_from_claimsco:
+        top_left = regions.get("top_left", "").lower()
+        filename_lower = record.original_filename.lower()
+        afca_indicators = [
+            "afca" in top_left,
+            "australian financial complaints authority" in page1_normalized,
+            "afca" in filename_lower,
+        ]
+        if any(afca_indicators) and what_lower not in ["claimsco letter to idr"]:
+            record.who = "Complainant"
+            record.what = "ClaimsCo Letter to IDR"
+            record.entity = "ClaimsCo"
+
     # If authored by ClaimsCo, set entity to ClaimsCo (logo may be image-only)
     if is_from_claimsco and record.entity != "ClaimsCo":
         record.entity = "ClaimsCo"
