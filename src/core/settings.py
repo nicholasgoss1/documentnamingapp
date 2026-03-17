@@ -266,7 +266,7 @@ DEFAULT_SETTINGS = {
         "Supplementary Technical Assessment Report": True,
         "Hail Report": True,
         "Quote": True,
-        "IDR FDL": False,
+        "IDR FDL": True,
         "Notice of Response": False,
         "Notice of Response from QBE": False,
         "AFCA Submission": False,
