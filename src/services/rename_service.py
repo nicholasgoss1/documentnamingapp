@@ -51,6 +51,9 @@ def validate_batch(records: List[DocumentRecord]) -> List[Tuple[int, str]]:
     for i, rec in enumerate(records):
         if rec.rename_status != RenameStatus.APPROVED:
             continue
+        # Skip records marked as DUPLICATE — they won't be renamed to real names
+        if rec.proposed_filename and rec.proposed_filename.upper().startswith("DUPLICATE"):
+            continue
         valid, msg = validate_rename(rec)
         if not valid:
             errors.append((i, msg))
@@ -86,6 +89,9 @@ def execute_rename_batch(records: List[DocumentRecord]) -> Tuple[int, int, str]:
 
         for i, rec in enumerate(records):
             if rec.rename_status != RenameStatus.APPROVED:
+                continue
+            # Skip records marked as DUPLICATE — they should not be renamed
+            if rec.proposed_filename and rec.proposed_filename.upper().startswith("DUPLICATE"):
                 continue
 
             source = rec.file_path

@@ -25,9 +25,12 @@ EDITABLE_COLUMNS = {1, 2, 3, 4}  # WHO, DATE, ENTITY, WHAT
 
 
 def _rebuild_filename(rec: DocumentRecord):
-    """Rebuild proposed filename, keeping DUPLICATE.pdf for duplicate records."""
+    """Rebuild proposed filename, keeping DUPLICATE filename for duplicate records."""
     if rec.duplicate_status not in (DuplicateStatus.NONE, None):
-        rec.proposed_filename = "DUPLICATE.pdf"
+        # Preserve existing DUPLICATE filename (including any collision suffix)
+        if not rec.proposed_filename or not rec.proposed_filename.upper().startswith("DUPLICATE"):
+            rec.proposed_filename = "DUPLICATE.pdf"
+        # else: keep existing "DUPLICATE.pdf", "DUPLICATE (2).pdf", etc.
     else:
         rec.proposed_filename = rec.build_proposed_filename()
 
