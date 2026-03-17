@@ -206,7 +206,7 @@ DEFAULT_SETTINGS = {
         "AFCA Submission", "Letter of Engagement", "Building Report",
         "Supplementary Report", "Supplementary Technical Assessment Report",
         "Hail Report", "Quote", "Weather Pack", "AAF to be signed",
-        "Delegation of Authority",
+        "Delegation of Authority", "Information Sheet",
         "Timeline",
         "Request for Information", "Written Preliminary Assessment"
     ],
@@ -225,9 +225,14 @@ DEFAULT_SETTINGS = {
             "policy schedule", "schedule of insurance"
         ],
         "PDS": ["product disclosure statement"],
+        "Information Sheet": [
+            "complaint handling", "complaints handling",
+            "information sheet", "information brochure",
+            "handling your complaint",
+        ],
         "IDR FDL": [
             "idr", "final decision letter", "internal dispute resolution",
-            "idr response", "final decision", "complaint"
+            "idr response", "final decision"
         ],
         "Notice of Response": ["notice of response"],
         "AFCA Submission": ["afca submission", "submission to afca"],
@@ -276,7 +281,8 @@ DEFAULT_SETTINGS = {
         "Claim Lodgement Form": False,
         "Initial Claims Advice": False,
         "Timeline": False,
-        "Delegation of Authority": True
+        "Delegation of Authority": True,
+        "Information Sheet": True
     },
     "presets": {}
 }
