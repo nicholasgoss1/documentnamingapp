@@ -36,3 +36,63 @@ Name: "{autodesktop}\Claim File Renamer"; Filename: "{app}\ClaimFileRenamer.exe"
 
 [Run]
 Filename: "{app}\ClaimFileRenamer.exe"; Description: "{cm:LaunchProgram,Claim File Renamer}"; Flags: nowait postinstall skipifsilent
+
+[Code]
+function GetUninstallString(): String;
+var
+  UninstallKey: String;
+  UninstallString: String;
+begin
+  Result := '';
+  UninstallKey := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#SetupSetting("AppId")}_is1';
+  if RegQueryStringValue(HKLM, UninstallKey, 'UninstallString', UninstallString) then
+    Result := UninstallString
+  else if RegQueryStringValue(HKCU, UninstallKey, 'UninstallString', UninstallString) then
+    Result := UninstallString;
+end;
+
+function GetInstalledVersion(): String;
+var
+  UninstallKey: String;
+  DisplayVersion: String;
+begin
+  Result := '';
+  UninstallKey := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#SetupSetting("AppId")}_is1';
+  if RegQueryStringValue(HKLM, UninstallKey, 'DisplayVersion', DisplayVersion) then
+    Result := DisplayVersion
+  else if RegQueryStringValue(HKCU, UninstallKey, 'DisplayVersion', DisplayVersion) then
+    Result := DisplayVersion;
+end;
+
+function InitializeSetup(): Boolean;
+var
+  UninstallString: String;
+  InstalledVersion: String;
+  ResultCode: Integer;
+begin
+  Result := True;
+  UninstallString := GetUninstallString();
+  if UninstallString <> '' then
+  begin
+    InstalledVersion := GetInstalledVersion();
+    if MsgBox('Claim File Renamer version ' + InstalledVersion + ' is already installed.' + #13#10 + #13#10 +
+              'The previous version must be uninstalled before installing this version.' + #13#10 + #13#10 +
+              'Would you like to uninstall it now?',
+              mbConfirmation, MB_YESNO) = IDYES then
+    begin
+      Exec(RemoveQuotes(UninstallString), '/SILENT', '', SW_SHOW, ewWaitUntilTerminated, ResultCode);
+      // Verify uninstall succeeded
+      if GetUninstallString() <> '' then
+      begin
+        MsgBox('The previous version could not be uninstalled. Setup will now exit.', mbError, MB_OK);
+        Result := False;
+      end;
+    end
+    else
+    begin
+      MsgBox('The previous version must be uninstalled before installing this version.' + #13#10 +
+             'Setup will now exit.', mbInformation, MB_OK);
+      Result := False;
+    end;
+  end;
+end;
