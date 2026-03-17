@@ -194,6 +194,11 @@ class MainWindow(QMainWindow):
         lock_btn.clicked.connect(self._lock_selected)
         bulk_bar.addWidget(lock_btn)
 
+        remove_btn = QPushButton("Remove Selected")
+        remove_btn.setObjectName("dangerButton")
+        remove_btn.clicked.connect(self._remove_selected)
+        bulk_bar.addWidget(remove_btn)
+
         bulk_bar.addStretch()
         left_layout.addLayout(bulk_bar)
 
@@ -355,6 +360,8 @@ class MainWindow(QMainWindow):
         approve = menu.addAction("Approve")
         skip = menu.addAction("Skip")
         lock = menu.addAction("Lock / Unlock")
+        menu.addSeparator()
+        remove = menu.addAction("Remove")
 
         action = menu.exec_(self._table.viewport().mapToGlobal(pos))
         if action == set_ff:
@@ -381,6 +388,14 @@ class MainWindow(QMainWindow):
                     self._model.update_record(r, rec)
         elif action == lock:
             self._lock_selected()
+        elif action == remove:
+            self._remove_selected()
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Delete:
+            self._remove_selected()
+        else:
+            super().keyPressEvent(event)
 
     # ── Bulk Actions ──
 
@@ -435,6 +450,24 @@ class MainWindow(QMainWindow):
         if not ok:
             return
         self._model.find_replace(rows, find, replace)
+
+    def _remove_selected(self):
+        rows = self._selected_source_rows()
+        if not rows:
+            QMessageBox.information(self, "No Selection", "Select rows to remove.")
+            return
+        reply = QMessageBox.question(
+            self, "Remove Documents",
+            f"Remove {len(rows)} document(s) from the list?\n\n"
+            "This only removes them from the table, not from disk.",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if reply != QMessageBox.Yes:
+            return
+        self._model.remove_records(rows)
+        count = len(self._model.get_records())
+        self._file_count_label.setText(f"{count} files loaded")
+        self.statusBar().showMessage(f"{len(rows)} documents removed. {count} remaining.")
 
     def _lock_selected(self):
         rows = self._selected_source_rows()

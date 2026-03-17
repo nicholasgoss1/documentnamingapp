@@ -191,6 +191,17 @@ class DocumentTableModel(QAbstractTableModel):
                 self.index(max(rows), self.columnCount() - 1)
             )
 
+    def remove_records(self, rows: List[int]):
+        """Remove records at the given row indices."""
+        if not rows:
+            return
+        self.beginResetModel()
+        # Remove in reverse order to preserve indices
+        for row in sorted(rows, reverse=True):
+            if 0 <= row < len(self._records):
+                del self._records[row]
+        self.endResetModel()
+
     def find_replace(self, rows: List[int], find: str, replace: str):
         """Find and replace in proposed filenames for selected rows."""
         for row in rows:
