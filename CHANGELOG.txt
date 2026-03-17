@@ -1,0 +1,70 @@
+================================================================================
+  Claim File Renamer - Change Log
+================================================================================
+
+
+v1.3.0 - 17 Mar 2026
+---------------------
+NEW
+- Added "Engineering Report" document type with keywords (engineering report,
+  engineering assessment, engineering response, engineers report, etc.)
+- Added Clear Engineering Services (CES) as a recognised FF entity with aliases
+- Added RACQ Insurance to preferred entities for reliable detection
+- Added ClaimsCo logo to top-right of main window header
+
+IMPROVED
+- IDR FDL now always wins over Information Sheet when IDR keywords are present
+  (insurer complaint decision letters were being misclassified as Info Sheets)
+- Insurer authorship phrase detection: first-person insurer language
+  ("we have reviewed your complaint", "our final decision", etc.) now correctly
+  identifies documents as FF even without letterhead
+- Entity detection for IDR FDL letters without letterhead: when entity is a
+  complainant entity but document is insurer-authored, re-searches for FF entity
+- Engineering reports are always classified as FF-side documents
+- Page navigation up/down arrows replaced with larger buttons for easier clicking
+
+
+v1.2.0 - 14 Mar 2026
+---------------------
+FIXED
+- ClaimsCo-to-AFCA letters (e.g. AFCA Re-Lodgement) no longer misclassified
+  as Hail Report; correctly identified as ClaimsCo Letter to IDR
+- Two-digit year dates (e.g. 25.02.26) now parsed correctly
+
+
+v1.1.0 - 12 Mar 2026
+---------------------
+FIXED
+- File handle leaks causing rename errors on Windows
+- Quote amount extraction now finds the grand total, not the first dollar amount
+- Installer now prompts to uninstall previous version before installing
+- DUPLICATE files are now actually renamed on disk instead of being skipped
+
+IMPROVED
+- IDR FDL documents now include insurer name as ENTITY
+- Renamed AAF to Agent Authority Form; set fixed entities for DOA and AAF
+- Added Information Sheet document type; removed overly broad "complaint"
+  keyword from IDR detection
+- Multiple classification rule fixes for various document types
+
+
+v1.0.0 - 08 Mar 2026
+---------------------
+NEW
+- Initial release of Claim File Renamer
+- Drag-and-drop PDF processing with automatic field inference
+  (WHO, ENTITY, WHAT, DATE)
+- Spatial layout analysis for letter-format author detection
+- 150+ insurer entities recognised (general, life, health, white-label brands)
+- ClaimsCo authorship detection (text phrases + image-logo fallback)
+- AFCA document detection (RFI, Preliminary Assessment)
+- Duplicate detection and name collision resolution
+- PDF preview with page navigation
+- Bulk operations: Set Entity, Set WHAT, Set Date, NO DATE, Find/Replace,
+  Lock Selected, Remove Selected
+- Approve Selected / Approve All / Rename Approved workflow
+- Undo Last Batch support
+- Export to CSV
+- Dark mode / light mode toggle
+- Settings dialog for customising keywords, entities, and thresholds
+- Windows installer (Inno Setup)
