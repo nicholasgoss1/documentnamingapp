@@ -127,6 +127,17 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
                 record.entity = "ClaimsCo"
             else:
                 record.who = "FF"
+                # Entity may have been misidentified (e.g. complainant entity
+                # found in signature when the actual author is an insurer).
+                # Re-check: if current entity is a complainant entity, look
+                # for an FF entity in the text instead.
+                comp_ents = [e.lower() for e in mapping.get("complainant_entities", [])]
+                if record.entity.lower() in comp_ents:
+                    # Search for FF entities in the full text
+                    for ent_name in mapping.get("ff_entities", []):
+                        if ent_name.lower() in page1_lower or ent_name.lower() in (record.extracted_text or "").lower():
+                            record.entity = normalize_entity(ent_name, settings)
+                            break
 
     # ClaimsCo-authored non-IDR documents: detect for WHO override
     claimsco_authorship_phrases = [
@@ -162,6 +173,11 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
     # If authored by ClaimsCo, set entity to ClaimsCo (logo may be image-only)
     if is_from_claimsco and record.entity != "ClaimsCo":
         record.entity = "ClaimsCo"
+
+    # Engineering reports are always FF-side (prepared by engineering firms
+    # engaged by the insurer/loss adjuster, not the complainant)
+    if "engineering report" in what_lower:
+        record.who = "FF"
 
     # Internal documents: timelines, chronologies, file notes are internal work products
     internal_doc_types = ["timeline", "chronology", "file note", "file notes"]

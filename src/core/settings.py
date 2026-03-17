@@ -64,12 +64,13 @@ DEFAULT_SETTINGS = {
             "allianz", "suncorp", "iag", "cgu", "hollard",
             "youi", "zurich", "chubb", "aig", "aami",
             "gio", "nrma", "bupa", "medibank", "nib",
-            "budget direct", "racv", "racq"
+            "budget direct", "racv", "racq",
+            "engineering services", "clear engineering"
         ],
         "complainant_entities": ["ClaimsCo", "ACB", "AusCoast", "RUCA", "Balmoral", "Patcol"],
         "ff_entities": [
             "Sedgwick", "Campbell Constructions", "Morse Building Consultants",
-            "QBE", "WeatherWatch", "BoM",
+            "Clear Engineering Services", "QBE", "WeatherWatch", "BoM",
             # General insurers
             "AAI", "Suncorp", "IAG", "Insurance Australia Limited",
             "CGU", "Allianz", "Allianz Australia",
@@ -186,13 +187,19 @@ DEFAULT_SETTINGS = {
         "RCC National Pty Ltd": "RCC National",
         "RCC National Pty": "RCC National",
         "RCC": "RCC National",
+        "RACQ Insurance Limited": "RACQ Insurance",
+        "Clear Engineering Services Australia": "Clear Engineering Services",
+        "Clear Engineering Services Australia Pty Ltd": "Clear Engineering Services",
+        "Clear Engineering": "Clear Engineering Services",
+        "CES": "Clear Engineering Services",
         "Claims Made Easy": "ClaimsCo",
         "CLAIMS MADE EASY": "ClaimsCo",
         "claimsco.com.au": "ClaimsCo"
     },
     "preferred_entities": [
         "ClaimsCo", "Campbell Constructions", "Sedgwick",
-        "Morse Building Consultants", "RCC National", "QBE", "AFCA",
+        "Morse Building Consultants", "Clear Engineering Services",
+        "RCC National", "QBE", "RACQ Insurance", "AFCA",
         "ACB", "AusCoast", "RUCA", "Balmoral", "Patcol",
         "WeatherWatch", "BoM", "COI"
     ],
@@ -205,7 +212,7 @@ DEFAULT_SETTINGS = {
         "Notice of Response", "Notice of Response from QBE",
         "AFCA Submission", "Letter of Engagement", "Building Report",
         "Supplementary Report", "Supplementary Technical Assessment Report",
-        "Hail Report", "Quote", "Weather Pack", "Agent Authority Form",
+        "Engineering Report", "Hail Report", "Quote", "Weather Pack", "Agent Authority Form",
         "Delegation of Authority", "Information Sheet",
         "Timeline",
         "Request for Information", "Written Preliminary Assessment"
@@ -232,7 +239,10 @@ DEFAULT_SETTINGS = {
         ],
         "IDR FDL": [
             "idr", "final decision letter", "internal dispute resolution",
-            "idr response", "final decision"
+            "idr response", "final decision",
+            "we have reviewed your complaint",
+            "complaints handling process",
+            "our final decision",
         ],
         "Notice of Response": ["notice of response"],
         "AFCA Submission": ["afca submission", "submission to afca"],
@@ -242,6 +252,12 @@ DEFAULT_SETTINGS = {
         "Supplementary Technical Assessment Report": [
             "supplementary technical assessment",
             "supplementary technical report"
+        ],
+        "Engineering Report": [
+            "engineering report", "engineering assessment",
+            "engineering response", "engineers report",
+            "engineers initial visual report", "engineers request for information",
+            "engineering services",
         ],
         "Hail Report": ["hail report", "hail damage", "hail assessment"],
         "Quote": ["quote", "quotation", "estimate"],
@@ -264,6 +280,7 @@ DEFAULT_SETTINGS = {
         "Building Report": True,
         "Supplementary Report": True,
         "Supplementary Technical Assessment Report": True,
+        "Engineering Report": True,
         "Hail Report": True,
         "Quote": True,
         "IDR FDL": True,

@@ -100,6 +100,24 @@ def infer_who(page1_text: str, full_text: str, filename: str,
         if "request for information" in text_lower or "preliminary assessment" in text_lower:
             return "AFCA", 16
 
+    # Insurer-authored letter detection: if the document uses first-person
+    # insurer language (e.g. "we have reviewed your complaint", "our final
+    # decision"), the document is FROM the insurer regardless of keyword counts.
+    insurer_authorship_phrases = [
+        "we have reviewed your complaint",
+        "we have completed our review",
+        "our final decision",
+        "our complaints handling process",
+        "in accordance with our",
+        "we declined the claim",
+        "we have determined",
+        "we issued a final decision",
+    ]
+    if any(phrase in text_normalized for phrase in insurer_authorship_phrases):
+        # Confirm an FF entity/keyword is present before overriding
+        if ff_score > 0 or any(ent in text_lower for ent in ff_entities):
+            return "FF", 17
+
     # Specific entity checks
     for ent in complainant_entities:
         if ent in text_lower:
@@ -252,6 +270,18 @@ def infer_what(page1_text: str, full_text: str, filename: str,
                 best_score = score
                 best_match = label
                 best_specificity = specificity
+
+    # Conflict resolution: IDR FDL always beats Information Sheet.
+    # Letters about complaint decisions contain words like "complaint" which
+    # trigger Information Sheet, but if IDR FDL keywords also match, the
+    # document is a final decision letter, not an information sheet.
+    if best_match == "Information Sheet":
+        idr_keywords = doc_keywords.get("IDR FDL", [])
+        for kw in idr_keywords:
+            kw_lower = kw.lower()
+            if kw_lower in filename_lower or kw_lower in text_lower or kw_lower in full_lower:
+                best_match = "IDR FDL"
+                break
 
     if best_match:
         # Handle progress report numbering
