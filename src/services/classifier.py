@@ -224,6 +224,7 @@ def infer_what(page1_text: str, full_text: str, filename: str,
     doc_keywords = settings.get("doc_type_keywords", {})
     preferred_labels = settings.get("preferred_doc_labels", [])
     text_lower = (page1_text + " " + filename).lower()
+    filename_lower = filename.lower()
     full_lower = full_text.lower()
 
     best_match = ""
@@ -233,8 +234,10 @@ def infer_what(page1_text: str, full_text: str, filename: str,
     for label, keywords in doc_keywords.items():
         for kw in keywords:
             kw_lower = kw.lower()
-            # Check page 1 and filename first (higher weight)
-            if kw_lower in text_lower:
+            # Filename match is strongest signal (human-assigned name)
+            if kw_lower in filename_lower:
+                score = 30
+            elif kw_lower in text_lower:
                 score = 20
                 if kw_lower in page1_text[:500].lower():
                     score = 25  # Very high if in heading area

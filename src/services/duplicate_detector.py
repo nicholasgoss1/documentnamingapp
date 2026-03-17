@@ -1,15 +1,31 @@
 """
 Duplicate detection service.
-Detects exact binary duplicates, content duplicates, and filename collisions.
+Detects exact binary duplicates, content duplicates, field-based duplicates,
+and filename collisions.
 
 Duplicate naming rule:
 - First occurrence of a duplicate: renamed normally by convention
 - Second, third etc: renamed to just "DUPLICATE.pdf" (or "DUPLICATE (2).pdf" etc)
 """
+import re
 from typing import Dict, List
 from collections import defaultdict
 
 from src.core.models import DocumentRecord, DuplicateStatus
+
+
+def _normalize_what_for_comparison(what: str) -> str:
+    """Normalize a WHAT field for duplicate comparison.
+    Strips noise words like 'DUPLICATE', trailing numbers, and extra whitespace."""
+    if not what:
+        return ""
+    s = what.lower()
+    # Remove "duplicate" and variations
+    s = re.sub(r'\bduplicate\b', '', s, flags=re.IGNORECASE)
+    # Remove trailing numbers/suffixes like " 1", " (2)"
+    s = re.sub(r'\s*\(\d+\)\s*$', '', s)
+    s = re.sub(r'\s+\d+\s*$', '', s)
+    return s.strip()
 
 
 def detect_duplicates(records: List[DocumentRecord]) -> List[DocumentRecord]:
@@ -48,7 +64,30 @@ def detect_duplicates(records: List[DocumentRecord]) -> List[DocumentRecord]:
                 if records[idx].proposed_filename != "DUPLICATE.pdf":
                     records[idx].proposed_filename = "DUPLICATE.pdf"
 
-    # 3. Filename collisions (same proposed filename, not already DUPLICATE)
+    # 3. Field-based duplicates (same WHO+DATE+ENTITY and similar WHAT)
+    # Catches cases where files are different PDFs of the same document
+    # (e.g. one filename contains "DUPLICATE" or a copy number).
+    # Only compare records that have at least WHO and WHAT populated.
+    field_groups: Dict[str, List[int]] = defaultdict(list)
+    for i, rec in enumerate(records):
+        if rec.duplicate_status != DuplicateStatus.NONE:
+            continue
+        what_norm = _normalize_what_for_comparison(rec.what)
+        if not rec.who and not what_norm:
+            continue  # Skip records with no meaningful fields to compare
+        key = f"{(rec.who or '').lower()}|{(rec.date or '').lower()}|{(rec.entity or '').lower()}|{what_norm}"
+        field_groups[key].append(i)
+
+    for key, indices in field_groups.items():
+        if len(indices) > 1:
+            for idx in indices:
+                if records[idx].duplicate_status == DuplicateStatus.NONE:
+                    records[idx].duplicate_status = DuplicateStatus.LIKELY_DUPLICATE
+            for idx in indices[1:]:
+                if records[idx].proposed_filename != "DUPLICATE.pdf":
+                    records[idx].proposed_filename = "DUPLICATE.pdf"
+
+    # 4. Filename collisions (same proposed filename, not already DUPLICATE)
     name_groups: Dict[str, List[int]] = defaultdict(list)
     for i, rec in enumerate(records):
         if rec.proposed_filename:

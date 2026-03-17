@@ -5,15 +5,20 @@ All processing is local.
 import re
 from typing import Tuple
 
+# Full and abbreviated month names for regex alternation
+_MONTHS_FULL = "January|February|March|April|May|June|July|August|September|October|November|December"
+_MONTHS_ABBR = "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec"
+_MONTHS_ALL = f"{_MONTHS_FULL}|{_MONTHS_ABBR}"
+
 # Patterns for date extraction
 DATE_PATTERNS = [
     # dd/mm/yyyy or dd.mm.yyyy or dd-mm-yyyy
     (r'\b(\d{1,2})[./\-](\d{1,2})[./\-](\d{4})\b', "dmy"),
     # yyyy-mm-dd (ISO)
     (r'\b(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})\b', "ymd"),
-    # Written dates: 11 April 2024, April 11, 2024
-    (r'\b(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})\b', "dMy"),
-    (r'\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})\b', "Mdy"),
+    # Written dates: 11 April 2024, 11 Apr 2024, April 11, 2024, Apr 11, 2024
+    (rf'\b(\d{{1,2}})\s+({_MONTHS_ALL})\s+(\d{{4}})\b', "dMy"),
+    (rf'\b({_MONTHS_ALL})\s+(\d{{1,2}}),?\s+(\d{{4}})\b', "Mdy"),
     # mm/yyyy or mm.yyyy (partial) - only match if NOT preceded by digit+separator
     (r'(?<!\d[./\-]\d)(?<!\d[./\-])(\d{1,2})[./\-](\d{4})\b', "my"),
 ]
@@ -21,7 +26,10 @@ DATE_PATTERNS = [
 MONTH_MAP = {
     "january": "01", "february": "02", "march": "03", "april": "04",
     "may": "05", "june": "06", "july": "07", "august": "08",
-    "september": "09", "october": "10", "november": "11", "december": "12"
+    "september": "09", "october": "10", "november": "11", "december": "12",
+    "jan": "01", "feb": "02", "mar": "03", "apr": "04",
+    "jun": "06", "jul": "07", "aug": "08",
+    "sep": "09", "oct": "10", "nov": "11", "dec": "12",
 }
 
 # Document types that use specific date rules
@@ -38,6 +46,7 @@ PDS_TYPES = ["pds"]
 LODGEMENT_TYPES = ["claim lodgement email", "claim lodgement form"]
 QUOTE_TYPES = ["quote"]
 PHOTO_TYPES = ["photo schedule"]
+INTERNAL_TYPES = ["timeline", "chronology", "file note"]
 
 
 def _valid_date_parts(d: int = 1, m: int = 1, y: int = 2000) -> bool:
@@ -236,7 +245,14 @@ def infer_date(doc_type: str, page1_text: str, full_text: str,
                 return date, 10
             return "NO DATE", 3
 
-    # 8. Weather documents
+    # 8. Internal documents (timelines, chronologies, file notes)
+    if any(t in doc_lower for t in INTERNAL_TYPES):
+        date, is_partial = find_page1_top_date(page1_text)
+        if date:
+            return date, 15
+        return "NO DATE", 5
+
+    # 9. Weather documents
     if "weather" in doc_lower:
         date, _ = find_page1_top_date(page1_text)
         if date:

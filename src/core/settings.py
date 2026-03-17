@@ -206,6 +206,7 @@ DEFAULT_SETTINGS = {
         "AFCA Submission", "Letter of Engagement", "Building Report",
         "Supplementary Report", "Supplementary Technical Assessment Report",
         "Hail Report", "Quote", "Weather Pack", "AAF to be signed",
+        "Timeline",
         "Request for Information", "Written Preliminary Assessment"
     ],
     "doc_type_keywords": {
@@ -218,8 +219,11 @@ DEFAULT_SETTINGS = {
         "Claim Lodgement Email": ["claim lodgement email", "lodgement email"],
         "Claim Lodgement Form": ["claim lodgement form", "claim form", "lodgement form"],
         "Policy Schedule": ["policy schedule", "schedule of insurance"],
-        "Certificate of Insurance": ["certificate of insurance", "coi"],
-        "PDS": ["product disclosure statement", "pds"],
+        "Certificate of Insurance": [
+            "certificate of insurance", "coi",
+            "your insurance", "certificate of currency"
+        ],
+        "PDS": ["product disclosure statement"],
         "IDR FDL": [
             "idr", "final decision letter", "internal dispute resolution",
             "idr response", "final decision", "complaint"
@@ -237,6 +241,7 @@ DEFAULT_SETTINGS = {
         "Quote": ["quote", "quotation", "estimate"],
         "Weather Pack": ["weather pack", "weather report", "weather data"],
         "AAF to be signed": ["authority and access form", "aaf"],
+        "Timeline": ["timeline", "chronology", "file note", "file notes"],
         "Request for Information": ["request for information", "rfi"],
         "Written Preliminary Assessment": [
             "written preliminary assessment", "preliminary assessment"
@@ -268,7 +273,8 @@ DEFAULT_SETTINGS = {
         "Written Preliminary Assessment": False,
         "Claim Lodgement Email": False,
         "Claim Lodgement Form": False,
-        "Initial Claims Advice": False
+        "Initial Claims Advice": False,
+        "Timeline": False
     },
     "presets": {}
 }

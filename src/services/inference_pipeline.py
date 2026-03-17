@@ -139,6 +139,11 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
     if is_from_claimsco and record.entity != "ClaimsCo":
         record.entity = "ClaimsCo"
 
+    # Internal documents: timelines, chronologies, file notes are internal work products
+    internal_doc_types = ["timeline", "chronology", "file note", "file notes"]
+    if any(dt in what_lower for dt in internal_doc_types):
+        record.who = "Internal Document"
+
     # These document types are always complainant-side regardless of issuer
     complainant_doc_types = [
         "certificate of insurance", "letter of engagement",
