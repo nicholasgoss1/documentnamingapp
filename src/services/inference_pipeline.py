@@ -156,7 +156,7 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
     complainant_doc_types = [
         "certificate of insurance", "policy schedule",
         "letter of engagement", "delegation of authority",
-        "aaf to be signed", "afca submission",
+        "agent authority form", "aaf to be signed", "afca submission",
         "pds", "product disclosure statement",
     ]
     if any(dt in what_lower for dt in complainant_doc_types):
@@ -165,6 +165,14 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
     # Letter of Engagement entity is always ClaimsCo
     if "letter of engagement" in what_lower:
         record.entity = "ClaimsCo"
+
+    # Delegation of Authority entity is always DOA
+    if "delegation of authority" in what_lower:
+        record.entity = "DOA"
+
+    # Agent Authority Form entity is always AAF
+    if "agent authority form" in what_lower:
+        record.entity = "AAF"
 
     # Check if ENTITY should be included for this doc type
     if not should_include_entity(record.what, record.entity, settings):

@@ -93,7 +93,7 @@ def detect_duplicates(records: List[DocumentRecord]) -> List[DocumentRecord]:
     # likely the same document re-signed or re-scanned.
     ONE_PER_CLAIM_TYPES = [
         "delegation of authority", "letter of engagement",
-        "aaf to be signed", "authority and access form",
+        "agent authority form", "aaf to be signed", "authority and access form",
     ]
     one_per_claim_groups: Dict[str, List[int]] = defaultdict(list)
     for i, rec in enumerate(records):

@@ -308,8 +308,11 @@ def extract_heading(page1_text: str) -> str:
 def clean_filename_for_what(filename: str) -> str:
     """Clean original filename to extract a potential WHAT value."""
     name = filename
-    if name.lower().endswith(".pdf"):
-        name = name[:-4]
+    # Strip common file extensions (the file may be a converted image)
+    for ext in [".pdf", ".jpeg", ".jpg", ".png", ".tif", ".tiff", ".bmp"]:
+        if name.lower().endswith(ext):
+            name = name[:-len(ext)]
+            break
     # Remove common prefixes
     name = re.sub(r'^[Aa]nnexure\s*\d+\s*[-_]?\s*', '', name)
     # Remove dates
@@ -318,6 +321,11 @@ def clean_filename_for_what(filename: str) -> str:
     # Clean separators
     name = re.sub(r'[_\-]+', ' ', name)
     name = re.sub(r'\s+', ' ', name).strip()
+    # Reject meaningless names (generic scan/image filenames)
+    meaningless = {"image", "scan", "photo", "img", "doc", "document",
+                   "file", "page", "untitled", "screenshot"}
+    if re.sub(r'\d+', '', name).strip().lower() in meaningless:
+        return ""
     return name
 
 

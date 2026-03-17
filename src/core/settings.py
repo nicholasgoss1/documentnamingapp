@@ -205,7 +205,7 @@ DEFAULT_SETTINGS = {
         "Notice of Response", "Notice of Response from QBE",
         "AFCA Submission", "Letter of Engagement", "Building Report",
         "Supplementary Report", "Supplementary Technical Assessment Report",
-        "Hail Report", "Quote", "Weather Pack", "AAF to be signed",
+        "Hail Report", "Quote", "Weather Pack", "Agent Authority Form",
         "Delegation of Authority", "Information Sheet",
         "Timeline",
         "Request for Information", "Written Preliminary Assessment"
@@ -246,8 +246,8 @@ DEFAULT_SETTINGS = {
         "Hail Report": ["hail report", "hail damage", "hail assessment"],
         "Quote": ["quote", "quotation", "estimate"],
         "Weather Pack": ["weather pack", "weather report", "weather data"],
-        "AAF to be signed": ["authority and access form", "aaf"],
-        "Delegation of Authority": ["delegation of authority", "delegation authority"],
+        "Agent Authority Form": ["authority and access form", "aaf"],
+        "Delegation of Authority": ["delegation of authority", "delegation authority", "doa"],
         "Timeline": ["timeline", "chronology", "file note", "file notes"],
         "Request for Information": ["request for information", "rfi"],
         "Written Preliminary Assessment": [
@@ -274,7 +274,7 @@ DEFAULT_SETTINGS = {
         "Certificate of Insurance": True,
         "PDS": True,
         "Weather Pack": False,
-        "AAF to be signed": False,
+        "Agent Authority Form": False,
         "Request for Information": False,
         "Written Preliminary Assessment": False,
         "Claim Lodgement Email": False,

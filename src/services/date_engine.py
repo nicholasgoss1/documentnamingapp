@@ -40,7 +40,7 @@ LETTER_TYPES = [
     "idr fdl", "request for information", "written preliminary assessment",
     "initial claims advice", "weather pack"
 ]
-SIGNED_TYPES = ["letter of engagement", "aaf to be signed", "delegation of authority"]
+SIGNED_TYPES = ["letter of engagement", "agent authority form", "aaf to be signed", "delegation of authority"]
 POLICY_TYPES = ["policy schedule", "certificate of insurance"]
 PDS_TYPES = ["pds"]
 LODGEMENT_TYPES = ["claim lodgement email", "claim lodgement form"]
