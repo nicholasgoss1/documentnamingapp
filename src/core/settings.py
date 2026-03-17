@@ -200,12 +200,13 @@ DEFAULT_SETTINGS = {
         "Site Report", "Photo Schedule", "Assessment Report",
         "Progress Report 1", "Progress Report 2", "Roof Report",
         "Initial Claims Advice", "Claim Lodgement Email",
-        "Claim Lodgement Form", "Policy Schedule",
+        "Claim Lodgement Form",
         "Certificate of Insurance", "PDS", "IDR FDL",
         "Notice of Response", "Notice of Response from QBE",
         "AFCA Submission", "Letter of Engagement", "Building Report",
         "Supplementary Report", "Supplementary Technical Assessment Report",
         "Hail Report", "Quote", "Weather Pack", "AAF to be signed",
+        "Delegation of Authority",
         "Timeline",
         "Request for Information", "Written Preliminary Assessment"
     ],
@@ -218,10 +219,10 @@ DEFAULT_SETTINGS = {
         "Initial Claims Advice": ["initial claims advice", "initial advice"],
         "Claim Lodgement Email": ["claim lodgement email", "lodgement email"],
         "Claim Lodgement Form": ["claim lodgement form", "claim form", "lodgement form"],
-        "Policy Schedule": ["policy schedule", "schedule of insurance"],
         "Certificate of Insurance": [
             "certificate of insurance", "coi",
-            "your insurance", "certificate of currency"
+            "your insurance", "certificate of currency",
+            "policy schedule", "schedule of insurance"
         ],
         "PDS": ["product disclosure statement"],
         "IDR FDL": [
@@ -241,6 +242,7 @@ DEFAULT_SETTINGS = {
         "Quote": ["quote", "quotation", "estimate"],
         "Weather Pack": ["weather pack", "weather report", "weather data"],
         "AAF to be signed": ["authority and access form", "aaf"],
+        "Delegation of Authority": ["delegation of authority", "delegation authority"],
         "Timeline": ["timeline", "chronology", "file note", "file notes"],
         "Request for Information": ["request for information", "rfi"],
         "Written Preliminary Assessment": [
@@ -264,9 +266,8 @@ DEFAULT_SETTINGS = {
         "Notice of Response from QBE": False,
         "AFCA Submission": False,
         "Letter of Engagement": False,
-        "Policy Schedule": False,
         "Certificate of Insurance": True,
-        "PDS": False,
+        "PDS": True,
         "Weather Pack": False,
         "AAF to be signed": False,
         "Request for Information": False,
@@ -274,7 +275,8 @@ DEFAULT_SETTINGS = {
         "Claim Lodgement Email": False,
         "Claim Lodgement Form": False,
         "Initial Claims Advice": False,
-        "Timeline": False
+        "Timeline": False,
+        "Delegation of Authority": True
     },
     "presets": {}
 }

@@ -109,8 +109,12 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
             # Fallback: check ClaimsCo authorship phrases
             claimsco_authorship_phrases = [
                 "on behalf of our mutual client",
+                "on behalf of the below complainant",
+                "on behalf of the complainant",
+                "submit a complaint on behalf",
                 "claims made easy",
                 "desired outcome",
+                "resolution of claim settlement",
             ]
             is_from_claimsco = (
                 "claimsco" in top_right
@@ -127,8 +131,12 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
     # ClaimsCo-authored non-IDR documents: detect for WHO override
     claimsco_authorship_phrases = [
         "on behalf of our mutual client",
+        "on behalf of the below complainant",
+        "on behalf of the complainant",
+        "submit a complaint on behalf",
         "claims made easy",
         "desired outcome",
+        "resolution of claim settlement",
     ]
     is_from_claimsco = (
         "claimsco" in top_right
@@ -146,15 +154,17 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
 
     # These document types are always complainant-side regardless of issuer
     complainant_doc_types = [
-        "certificate of insurance", "letter of engagement",
+        "certificate of insurance", "policy schedule",
+        "letter of engagement", "delegation of authority",
         "aaf to be signed", "afca submission",
+        "pds", "product disclosure statement",
     ]
     if any(dt in what_lower for dt in complainant_doc_types):
         record.who = "Complainant"
 
-    # COI entity should be "COI" not the insurer
-    if "certificate of insurance" in what_lower:
-        record.entity = "COI"
+    # Letter of Engagement entity is always ClaimsCo
+    if "letter of engagement" in what_lower:
+        record.entity = "ClaimsCo"
 
     # Check if ENTITY should be included for this doc type
     if not should_include_entity(record.what, record.entity, settings):

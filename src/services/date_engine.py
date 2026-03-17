@@ -40,7 +40,7 @@ LETTER_TYPES = [
     "idr fdl", "request for information", "written preliminary assessment",
     "initial claims advice", "weather pack"
 ]
-SIGNED_TYPES = ["letter of engagement", "aaf to be signed"]
+SIGNED_TYPES = ["letter of engagement", "aaf to be signed", "delegation of authority"]
 POLICY_TYPES = ["policy schedule", "certificate of insurance"]
 PDS_TYPES = ["pds"]
 LODGEMENT_TYPES = ["claim lodgement email", "claim lodgement form"]
@@ -126,6 +126,21 @@ def find_signed_date(text: str) -> str:
     return ""
 
 
+def find_printed_on_date(text: str) -> str:
+    """Look for 'Printed On: DD/MM/YYYY' pattern common in site reports."""
+    patterns = [
+        r'[Pp]rinted\s+[Oo]n\s*[:.]?\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})',
+        r'[Pp]rinted\s+[Oo]n\s*[:.]?\s*(\d{1,2}\s+(?:' + _MONTHS_ALL + r')\s+\d{4})',
+    ]
+    for pat in patterns:
+        m = re.search(pat, text, re.IGNORECASE)
+        if m:
+            sub_dates = extract_all_dates(m.group(0))
+            if sub_dates:
+                return sub_dates[0][0]
+    return ""
+
+
 def find_policy_inception_date(text: str) -> str:
     """Look for policy inception / effective-from date."""
     patterns = [
@@ -181,6 +196,10 @@ def infer_date(doc_type: str, page1_text: str, full_text: str,
         date, is_partial = find_page1_top_date(page1_text)
         if date:
             return date, 18 if not is_partial else 12
+        # Check for "Printed on DD/MM/YYYY" (common in site reports at bottom)
+        printed_date = find_printed_on_date(full_text)
+        if printed_date:
+            return printed_date, 16
         # fallback: any date in full text
         dates = extract_all_dates(full_text)
         if dates:

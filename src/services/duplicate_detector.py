@@ -87,6 +87,33 @@ def detect_duplicates(records: List[DocumentRecord]) -> List[DocumentRecord]:
                 if records[idx].proposed_filename != "DUPLICATE.pdf":
                     records[idx].proposed_filename = "DUPLICATE.pdf"
 
+    # 3b. One-per-claim document types: same WHO+ENTITY+WHAT regardless of date.
+    # Some document types (e.g. Delegation of Authority, Letter of Engagement)
+    # should only appear once per claim — duplicates with different dates are
+    # likely the same document re-signed or re-scanned.
+    ONE_PER_CLAIM_TYPES = [
+        "delegation of authority", "letter of engagement",
+        "aaf to be signed", "authority and access form",
+    ]
+    one_per_claim_groups: Dict[str, List[int]] = defaultdict(list)
+    for i, rec in enumerate(records):
+        if rec.duplicate_status != DuplicateStatus.NONE:
+            continue
+        what_norm = _normalize_what_for_comparison(rec.what)
+        if not any(t in what_norm for t in ONE_PER_CLAIM_TYPES):
+            continue
+        key = f"{(rec.who or '').lower()}|{(rec.entity or '').lower()}|{what_norm}"
+        one_per_claim_groups[key].append(i)
+
+    for key, indices in one_per_claim_groups.items():
+        if len(indices) > 1:
+            for idx in indices:
+                if records[idx].duplicate_status == DuplicateStatus.NONE:
+                    records[idx].duplicate_status = DuplicateStatus.LIKELY_DUPLICATE
+            for idx in indices[1:]:
+                if records[idx].proposed_filename != "DUPLICATE.pdf":
+                    records[idx].proposed_filename = "DUPLICATE.pdf"
+
     # 4. Filename collisions (same proposed filename, not already DUPLICATE)
     name_groups: Dict[str, List[int]] = defaultdict(list)
     for i, rec in enumerate(records):
