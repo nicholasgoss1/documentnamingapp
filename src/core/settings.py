@@ -8,7 +8,7 @@ from pathlib import Path
 from copy import deepcopy
 
 APP_NAME = "ClaimFileRenamer"
-APP_VERSION = "1.4.0"
+APP_VERSION = "1.4.1"
 
 
 def get_app_data_dir() -> Path:
@@ -67,13 +67,15 @@ DEFAULT_SETTINGS = {
             "budget direct", "racv", "racq",
             "engineering services", "clear engineering",
             "australian building & construction", "australian building and construction",
-            "tomkat roofing"
+            "tomkat roofing", "mcs group",
+            "certified building inspection"
         ],
         "complainant_entities": ["ClaimsCo", "ACB", "AusCoast", "RUCA", "Balmoral", "Patcol"],
         "ff_entities": [
             "Sedgwick", "Campbell Constructions", "Morse Building Consultants",
             "Clear Engineering Services", "Australian Building & Construction",
-            "Tomkat Roofing",
+            "Tomkat Roofing", "MCS Group",
+            "Certified Building Inspection Services",
             "QBE", "WeatherWatch", "BoM",
             # General insurers
             "AAI", "Suncorp", "IAG", "Insurance Australia Limited",
@@ -193,6 +195,14 @@ DEFAULT_SETTINGS = {
         "RCC National Pty Ltd": "RCC National",
         "RCC National Pty": "RCC National",
         "RCC": "RCC National",
+        "MCS Group Holdings Pty Ltd": "MCS Group",
+        "MCS Group Holdings": "MCS Group",
+        "MCS Group Independent National": "MCS Group",
+        "mcsgroup": "MCS Group",
+        "Certified Building Inspection Services": "Certified Building Inspection Services",
+        "Certified Pest and Building": "Certified Building Inspection Services",
+        "Certified Pest & Building": "Certified Building Inspection Services",
+        "certifiedbuildinginspection": "Certified Building Inspection Services",
         "Tomkat Roofing Pty Ltd": "Tomkat Roofing",
         "tomkatroofing": "Tomkat Roofing",
         "RACQ Insurance Limited": "RACQ Insurance",
@@ -213,6 +223,7 @@ DEFAULT_SETTINGS = {
         "ClaimsCo", "Campbell Constructions", "Sedgwick",
         "Morse Building Consultants", "Clear Engineering Services",
         "Australian Building & Construction", "Tomkat Roofing",
+        "MCS Group", "Certified Building Inspection Services",
         "RCC National", "QBE", "RACQ Insurance", "AFCA",
         "ACB", "AusCoast", "RUCA", "Balmoral", "Patcol",
         "WeatherWatch", "BoM", "COI"
@@ -222,7 +233,7 @@ DEFAULT_SETTINGS = {
         "Progress Report 1", "Progress Report 2", "Roof Report",
         "Initial Claims Advice", "Claim Lodgement Email",
         "Claim Lodgement Form",
-        "Certificate of Insurance", "PDS", "IDR FDL",
+        "Certificate of Insurance", "PDS", "Claims Team FDL", "IDR FDL",
         "Notice of Response", "Notice of Response from QBE",
         "AFCA Submission", "Letter of Engagement", "Building Report",
         "Supplementary Report", "Supplementary Technical Assessment Report",
@@ -247,6 +258,17 @@ DEFAULT_SETTINGS = {
             "policy schedule", "schedule of insurance"
         ],
         "PDS": ["product disclosure statement"],
+        "Claims Team FDL": [
+            "claim decision", "claims decision",
+            "allowing us to review your claim",
+            "we have assessed your claim",
+            "your claim has been assessed",
+            "your claim has been reviewed",
+            "we are unable to accept your claim",
+            "your policy does not cover",
+            "we regret to advise",
+            "we have declined",
+        ],
         "Information Sheet": [
             "complaint handling", "complaints handling",
             "information sheet", "information brochure",
@@ -298,6 +320,7 @@ DEFAULT_SETTINGS = {
         "Supplementary Report": True,
         "Supplementary Technical Assessment Report": True,
         "Engineering Report": True,
+        "Claims Team FDL": True,
         "TB32 Technical Bulletin": False,
         "Desktop Report": True,
         "Hail Report": True,

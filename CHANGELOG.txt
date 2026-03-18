@@ -3,6 +3,27 @@
 ================================================================================
 
 
+v1.4.1 - 18 Mar 2026
+---------------------
+NEW
+- Added "Claims Team FDL" document type for insurer claim decision letters
+  (keywords: "allowing us to review your claim", "your policy does not cover",
+  "we are unable to accept your claim", etc.)
+- Added MCS Group as a recognised FF entity with aliases (Holdings Pty Ltd,
+  Independent National, etc.)
+- Added Certified Building Inspection Services as a recognised FF entity with
+  aliases (Certified Pest and Building, Certified Pest & Building, etc.)
+
+FIXED
+- AAMI claim decision letters no longer misclassified as PDS: Claims Team FDL
+  now beats PDS in conflict resolution (letters referencing the PDS are not a PDS)
+- PDS documents now correctly show insurer entity (e.g. AAI for AAMI PDS) via
+  the AAMI → AAI alias added in v1.4.0
+
+IMPROVED
+- Claims Team FDL treated as FF-side document with insurer entity detection
+
+
 v1.4.0 - 18 Mar 2026
 ---------------------
 NEW

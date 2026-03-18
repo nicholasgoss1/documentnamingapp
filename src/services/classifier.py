@@ -285,6 +285,9 @@ def infer_what(page1_text: str, full_text: str, filename: str,
         # Letter of Engagement beats Delegation of Authority: engagement
         # documents may mention delegation but are primarily engagement letters.
         "Delegation of Authority": "Letter of Engagement",
+        # Claims Team FDL beats PDS: claim decision letters reference the
+        # PDS but the document itself is a final decision, not a PDS.
+        "PDS": "Claims Team FDL",
     }
     if best_match in conflict_overrides:
         override_label = conflict_overrides[best_match]

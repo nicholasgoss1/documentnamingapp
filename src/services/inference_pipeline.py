@@ -90,7 +90,7 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
     #   - If top-left has an FF entity but top-right does NOT → the
     #     letter is addressed TO the insurer → ClaimsCo Letter to IDR
     #   - Fallback: check ClaimsCo authorship phrases in body text
-    ff_doc_types = ["idr fdl", "idr", "final decision letter"]
+    ff_doc_types = ["idr fdl", "idr", "final decision letter", "claims team fdl"]
     if any(dt in what_lower for dt in ff_doc_types):
         top_left = regions.get("top_left", "").lower()
         from_has_ff = any(ent in top_right for ent in ff_ents)

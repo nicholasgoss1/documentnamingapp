@@ -40,7 +40,8 @@ LETTER_TYPES = [
     "hail report", "engineering report", "desktop report",
     "progress report", "supplementary report",
     "supplementary technical assessment report", "notice of response",
-    "idr fdl", "request for information", "written preliminary assessment",
+    "idr fdl", "claims team fdl",
+    "request for information", "written preliminary assessment",
     "initial claims advice", "weather pack"
 ]
 SIGNED_TYPES = ["letter of engagement", "agent authority form", "aaf to be signed", "delegation of authority"]
