@@ -8,7 +8,7 @@ from pathlib import Path
 from copy import deepcopy
 
 APP_NAME = "ClaimFileRenamer"
-APP_VERSION = "1.5.1"
+APP_VERSION = "1.5.2"
 
 
 def get_app_data_dir() -> Path:
@@ -199,10 +199,11 @@ DEFAULT_SETTINGS = {
         "MCS Group Holdings": "MCS Group",
         "MCS Group Independent National": "MCS Group",
         "mcsgroup": "MCS Group",
-        "Certified Building Inspection Services": "Certified Building Inspection Services",
+        "Certified Building Inspection": "Certified Building Inspection Services",
         "Certified Pest and Building": "Certified Building Inspection Services",
         "Certified Pest & Building": "Certified Building Inspection Services",
         "certifiedbuildinginspection": "Certified Building Inspection Services",
+        "www.certifiedbuildinginspection.com.au": "Certified Building Inspection Services",
         "BlueScope Steel": "BlueScope",
         "BlueScope Steel Limited": "BlueScope",
         "Tomkat Roofing Pty Ltd": "Tomkat Roofing",
@@ -383,21 +384,21 @@ class Settings:
         """
         changed = False
         saved_version = self._data.get("_settings_version", "0")
+        defaults = DEFAULT_SETTINGS
 
-        # v1.4.2+ migrations
+        # Version-specific migrations (one-time rule fixes)
         if saved_version < "1.4.2":
             rules = self._data.get("entity_include_rules", {})
-            # These were previously False but must now be True
-            force_true = [
-                "Letter of Engagement", "Request for Information",
-            ]
-            for key in force_true:
+            for key in ["Letter of Engagement", "Request for Information"]:
                 if key in rules and not rules[key]:
                     rules[key] = True
                     changed = True
 
-            # Add new doc types / entities / aliases from defaults
-            defaults = DEFAULT_SETTINGS
+        # Always sync: merge new entries from defaults into saved settings.
+        # This runs every version bump so newly added doc types, entities,
+        # and aliases are always available without requiring manual resets.
+        if saved_version != APP_VERSION:
+            # Add new dict keys (doc types, aliases, rules) from defaults
             for section in ["doc_type_keywords", "entity_aliases",
                             "entity_include_rules"]:
                 default_section = defaults.get(section, {})
@@ -416,7 +417,7 @@ class Settings:
                     current_pref.append(ent)
                     changed = True
 
-            # Add new FF entities that aren't already present
+            # Add new FF entities / keywords that aren't already present
             mapping = self._data.get("who_mapping", {})
             default_mapping = defaults.get("who_mapping", {})
             for list_key in ["ff_entities", "ff_keywords"]:
@@ -428,7 +429,9 @@ class Settings:
                         current_list.append(item)
                         changed = True
 
-        if changed or saved_version != APP_VERSION:
+            changed = True
+
+        if changed:
             self._data["_settings_version"] = APP_VERSION
             self.save()
 

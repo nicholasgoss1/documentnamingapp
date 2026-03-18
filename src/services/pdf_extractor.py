@@ -12,13 +12,20 @@ import fitz  # PyMuPDF
 # Unicode directional formatting characters that some PDFs embed around
 # every word.  These are invisible but break substring matching.
 _UNICODE_JUNK = re.compile(
-    '[\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069]'
+    '[\u00a0\u200b\u200c\u200d\u200e\u200f\u202a\u202b\u202c\u202d\u202e'
+    '\u2060\u2066\u2067\u2068\u2069\ufeff\ufffe]'
 )
 
 
 def _clean_text(text: str) -> str:
-    """Strip Unicode directional/formatting characters from extracted text."""
-    return _UNICODE_JUNK.sub('', text)
+    """Strip Unicode directional/formatting/invisible characters from extracted text.
+
+    Replaces non-breaking spaces with regular spaces so entity matching works.
+    """
+    text = _UNICODE_JUNK.sub(' ', text)
+    # Collapse multiple spaces to one
+    text = re.sub(r'  +', ' ', text)
+    return text
 
 
 def extract_text(file_path: str, max_pages: int = 5) -> str:

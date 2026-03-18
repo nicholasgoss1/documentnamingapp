@@ -3,6 +3,19 @@
 ================================================================================
 
 
+v1.5.2 - 18 Mar 2026
+---------------------
+FIXED
+- PDF text cleaning now strips non-breaking spaces (U+00A0), zero-width
+  spaces, BOM characters, and other invisible Unicode that some PDFs embed
+  between words. These were preventing entity name matching even after
+  whitespace normalization. Non-breaking spaces are replaced with regular
+  spaces (not deleted) to preserve word boundaries.
+- Added shorter entity alias "Certified Building Inspection" (4 words) as
+  fallback — less vulnerable to text extraction splitting across 5 words.
+  Also added full URL form "www.certifiedbuildinginspection.com.au".
+
+
 v1.5.1 - 18 Mar 2026
 ---------------------
 FIXED
