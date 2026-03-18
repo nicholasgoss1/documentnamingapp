@@ -134,7 +134,7 @@ class MainWindow(QMainWindow):
         logo_path = os.path.normpath(logo_path)
         if _HAS_SVG and os.path.exists(logo_path):
             self._logo = QSvgWidget(logo_path)
-            self._logo.setFixedSize(165, 45)
+            self._logo.setFixedSize(200, 54)
             top_bar.addWidget(self._logo, 0, Qt.AlignRight | Qt.AlignVCenter)
 
         main_layout.addLayout(top_bar)
