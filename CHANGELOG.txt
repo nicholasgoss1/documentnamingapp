@@ -3,6 +3,26 @@
 ================================================================================
 
 
+v1.5.0 - 18 Mar 2026
+---------------------
+FIXED
+- Letter of Engagement now always shows ENTITY = ClaimsCo: forced entity
+  overrides moved AFTER the entity_include_rules check so they can never
+  be cleared by settings
+- Request for Information now reliably shows insurer entity (e.g. AAI):
+  settings migration ensures entity_include_rules is updated from old
+  saved settings
+- Entity detection now scans up to 30 pages (was 5) when no entity is
+  found in the first 10 pages, catching entities deeper in long documents
+
+IMPROVED
+- Added settings migration system: when the app upgrades, new doc types,
+  entities, aliases, and rule changes are automatically merged into the
+  user's saved settings.json without losing custom modifications
+- Increased default text extraction from 5 to 10 pages for better date,
+  keyword, and entity detection across longer documents
+
+
 v1.4.2 - 18 Mar 2026
 ---------------------
 NEW

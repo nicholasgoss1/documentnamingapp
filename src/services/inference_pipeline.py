@@ -38,7 +38,7 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
 
     # Extract text
     record.page1_text = extract_page1_text(file_path)
-    record.extracted_text = extract_text(file_path, max_pages=5)
+    record.extracted_text = extract_text(file_path, max_pages=10)
     record.page1_regions = extract_page1_spatial(file_path)
 
     # Compute hashes
@@ -50,6 +50,13 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
         record.page1_text, record.extracted_text,
         record.original_filename, settings, record.page1_regions
     )
+    # If no entity found in first 10 pages, do a deeper scan (up to 30 pages)
+    if not entity:
+        deep_text = extract_text(file_path, max_pages=30)
+        entity, entity_conf = infer_entity(
+            record.page1_text, deep_text,
+            record.original_filename, settings, record.page1_regions
+        )
     record.entity = normalize_entity(entity, settings)
 
     # Infer WHO
@@ -195,21 +202,18 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
     if any(dt in what_lower for dt in complainant_doc_types):
         record.who = "Complainant"
 
-    # Letter of Engagement entity is always ClaimsCo
-    if "letter of engagement" in what_lower:
-        record.entity = "ClaimsCo"
-
-    # Delegation of Authority entity is always DOA
-    if "delegation of authority" in what_lower:
-        record.entity = "DOA"
-
-    # Agent Authority Form entity is always AAF
-    if "agent authority form" in what_lower:
-        record.entity = "AAF"
-
     # Check if ENTITY should be included for this doc type
     if not should_include_entity(record.what, record.entity, settings):
         record.entity = ""
+
+    # Forced entity overrides — these MUST run after should_include_entity
+    # so they are never cleared by user settings.
+    if "letter of engagement" in what_lower:
+        record.entity = "ClaimsCo"
+    if "delegation of authority" in what_lower:
+        record.entity = "DOA"
+    if "agent authority form" in what_lower:
+        record.entity = "AAF"
 
     # Special handling for quotes with amounts
     if record.what and "quote" in record.what.lower():

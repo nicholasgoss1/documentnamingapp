@@ -8,7 +8,7 @@ from pathlib import Path
 from copy import deepcopy
 
 APP_NAME = "ClaimFileRenamer"
-APP_VERSION = "1.4.2"
+APP_VERSION = "1.5.0"
 
 
 def get_app_data_dir() -> Path:
@@ -370,6 +370,65 @@ class Settings:
                 self._deep_merge(self._data, saved)
             except (json.JSONDecodeError, OSError):
                 pass
+        self._migrate()
+
+    def _migrate(self):
+        """Apply setting migrations for new versions.
+
+        When defaults change in ways that must override old saved values
+        (e.g. entity_include_rules flipped from False to True), this
+        method forces the correct value and persists it.
+        """
+        changed = False
+        saved_version = self._data.get("_settings_version", "0")
+
+        # v1.4.2+ migrations
+        if saved_version < "1.4.2":
+            rules = self._data.get("entity_include_rules", {})
+            # These were previously False but must now be True
+            force_true = [
+                "Letter of Engagement", "Request for Information",
+            ]
+            for key in force_true:
+                if key in rules and not rules[key]:
+                    rules[key] = True
+                    changed = True
+
+            # Add new doc types / entities / aliases from defaults
+            defaults = DEFAULT_SETTINGS
+            for section in ["doc_type_keywords", "entity_aliases",
+                            "entity_include_rules"]:
+                default_section = defaults.get(section, {})
+                current_section = self._data.get(section, {})
+                for key, value in default_section.items():
+                    if key not in current_section:
+                        current_section[key] = value
+                        changed = True
+
+            # Add new preferred entities that aren't already present
+            default_pref = defaults.get("preferred_entities", [])
+            current_pref = self._data.get("preferred_entities", [])
+            current_lower = [e.lower() for e in current_pref]
+            for ent in default_pref:
+                if ent.lower() not in current_lower:
+                    current_pref.append(ent)
+                    changed = True
+
+            # Add new FF entities that aren't already present
+            mapping = self._data.get("who_mapping", {})
+            default_mapping = defaults.get("who_mapping", {})
+            for list_key in ["ff_entities", "ff_keywords"]:
+                current_list = mapping.get(list_key, [])
+                default_list = default_mapping.get(list_key, [])
+                current_lower = [e.lower() for e in current_list]
+                for item in default_list:
+                    if item.lower() not in current_lower:
+                        current_list.append(item)
+                        changed = True
+
+        if changed or saved_version != APP_VERSION:
+            self._data["_settings_version"] = APP_VERSION
+            self.save()
 
     def save(self):
         with open(self._path, "w", encoding="utf-8") as f:
