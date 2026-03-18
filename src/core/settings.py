@@ -8,7 +8,7 @@ from pathlib import Path
 from copy import deepcopy
 
 APP_NAME = "ClaimFileRenamer"
-APP_VERSION = "1.4.1"
+APP_VERSION = "1.4.2"
 
 
 def get_app_data_dir() -> Path:
@@ -237,6 +237,7 @@ DEFAULT_SETTINGS = {
         "Notice of Response", "Notice of Response from QBE",
         "AFCA Submission", "Letter of Engagement", "Building Report",
         "Supplementary Report", "Supplementary Technical Assessment Report",
+        "Pre Purchase Inspection Report",
         "Engineering Report", "TB32 Technical Bulletin", "Desktop Report",
         "Hail Report", "Quote", "Weather Pack", "Agent Authority Form",
         "Delegation of Authority", "Information Sheet",
@@ -296,6 +297,11 @@ DEFAULT_SETTINGS = {
             "engineers initial visual report", "engineers request for information",
             "engineering services",
         ],
+        "Pre Purchase Inspection Report": [
+            "pre purchase inspection", "pre-purchase inspection",
+            "pre purchase building", "pre-purchase building",
+            "pre purchase report", "pre-purchase report",
+        ],
         "TB32 Technical Bulletin": ["tb-32", "tb 32", "tb32", "technical bulletin"],
         "Desktop Report": ["desktop report", "desktop assessment", "desktop review"],
         "Hail Report": ["hail report", "hail damage", "hail assessment"],
@@ -320,6 +326,7 @@ DEFAULT_SETTINGS = {
         "Supplementary Report": True,
         "Supplementary Technical Assessment Report": True,
         "Engineering Report": True,
+        "Pre Purchase Inspection Report": True,
         "Claims Team FDL": True,
         "TB32 Technical Bulletin": False,
         "Desktop Report": True,
@@ -329,12 +336,12 @@ DEFAULT_SETTINGS = {
         "Notice of Response": False,
         "Notice of Response from QBE": False,
         "AFCA Submission": False,
-        "Letter of Engagement": False,
+        "Letter of Engagement": True,
         "Certificate of Insurance": True,
         "PDS": True,
         "Weather Pack": False,
         "Agent Authority Form": False,
-        "Request for Information": False,
+        "Request for Information": True,
         "Written Preliminary Assessment": False,
         "Claim Lodgement Email": False,
         "Claim Lodgement Form": False,

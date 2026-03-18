@@ -3,6 +3,23 @@
 ================================================================================
 
 
+v1.4.2 - 18 Mar 2026
+---------------------
+NEW
+- Added "Pre Purchase Inspection Report" document type (always Complainant)
+  with keywords (pre purchase inspection, pre-purchase building, etc.)
+
+FIXED
+- TB32 Technical Bulletin no longer misclassified as Hail Report: TB32 now
+  beats Hail Report in conflict resolution (TB32 bulletins discuss hail
+  damage but are reference documents)
+- Letter of Engagement now always shows ENTITY = ClaimsCo (was being cleared
+  by entity_include_rules set to False; changed to True)
+- Request for Information now shows insurer ENTITY (e.g. AAI for AAMI letters)
+  — entity_include_rules changed from False to True
+- Pre Purchase Inspection Reports correctly classified as Complainant, not FF
+
+
 v1.4.1 - 18 Mar 2026
 ---------------------
 NEW

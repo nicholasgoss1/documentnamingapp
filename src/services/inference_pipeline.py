@@ -190,6 +190,7 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
         "letter of engagement", "delegation of authority",
         "agent authority form", "aaf to be signed", "afca submission",
         "pds", "product disclosure statement",
+        "pre purchase inspection report",
     ]
     if any(dt in what_lower for dt in complainant_doc_types):
         record.who = "Complainant"

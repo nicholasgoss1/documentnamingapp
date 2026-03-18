@@ -288,6 +288,9 @@ def infer_what(page1_text: str, full_text: str, filename: str,
         # Claims Team FDL beats PDS: claim decision letters reference the
         # PDS but the document itself is a final decision, not a PDS.
         "PDS": "Claims Team FDL",
+        # TB32 Technical Bulletin beats Hail Report: TB32 bulletins discuss
+        # hail damage but are reference documents, not hail reports.
+        "Hail Report": "TB32 Technical Bulletin",
     }
     if best_match in conflict_overrides:
         override_label = conflict_overrides[best_match]
