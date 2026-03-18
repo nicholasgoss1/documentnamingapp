@@ -8,7 +8,7 @@ from pathlib import Path
 from copy import deepcopy
 
 APP_NAME = "ClaimFileRenamer"
-APP_VERSION = "1.3.1"
+APP_VERSION = "1.4.0"
 
 
 def get_app_data_dir() -> Path:
@@ -66,12 +66,14 @@ DEFAULT_SETTINGS = {
             "gio", "nrma", "bupa", "medibank", "nib",
             "budget direct", "racv", "racq",
             "engineering services", "clear engineering",
-            "australian building & construction", "australian building and construction"
+            "australian building & construction", "australian building and construction",
+            "tomkat roofing"
         ],
         "complainant_entities": ["ClaimsCo", "ACB", "AusCoast", "RUCA", "Balmoral", "Patcol"],
         "ff_entities": [
             "Sedgwick", "Campbell Constructions", "Morse Building Consultants",
             "Clear Engineering Services", "Australian Building & Construction",
+            "Tomkat Roofing",
             "QBE", "WeatherWatch", "BoM",
             # General insurers
             "AAI", "Suncorp", "IAG", "Insurance Australia Limited",
@@ -158,6 +160,8 @@ DEFAULT_SETTINGS = {
         "Allianz Insurance": "Allianz",
         "Suncorp Group": "Suncorp",
         "AAI Limited": "AAI",
+        "AAMI": "AAI",
+        "aami.com.au": "AAI",
         "Insurance Australia Group": "IAG",
         "IAG Limited": "IAG",
         "CGU Insurance Limited": "CGU",
@@ -189,6 +193,8 @@ DEFAULT_SETTINGS = {
         "RCC National Pty Ltd": "RCC National",
         "RCC National Pty": "RCC National",
         "RCC": "RCC National",
+        "Tomkat Roofing Pty Ltd": "Tomkat Roofing",
+        "tomkatroofing": "Tomkat Roofing",
         "RACQ Insurance Limited": "RACQ Insurance",
         "Australian Building & Construction Group Pty Ltd": "Australian Building & Construction",
         "Australian Building & Construction Group": "Australian Building & Construction",
@@ -206,7 +212,7 @@ DEFAULT_SETTINGS = {
     "preferred_entities": [
         "ClaimsCo", "Campbell Constructions", "Sedgwick",
         "Morse Building Consultants", "Clear Engineering Services",
-        "Australian Building & Construction",
+        "Australian Building & Construction", "Tomkat Roofing",
         "RCC National", "QBE", "RACQ Insurance", "AFCA",
         "ACB", "AusCoast", "RUCA", "Balmoral", "Patcol",
         "WeatherWatch", "BoM", "COI"
@@ -220,7 +226,8 @@ DEFAULT_SETTINGS = {
         "Notice of Response", "Notice of Response from QBE",
         "AFCA Submission", "Letter of Engagement", "Building Report",
         "Supplementary Report", "Supplementary Technical Assessment Report",
-        "Engineering Report", "Hail Report", "Quote", "Weather Pack", "Agent Authority Form",
+        "Engineering Report", "TB32 Technical Bulletin", "Desktop Report",
+        "Hail Report", "Quote", "Weather Pack", "Agent Authority Form",
         "Delegation of Authority", "Information Sheet",
         "Timeline",
         "Request for Information", "Written Preliminary Assessment"
@@ -254,7 +261,7 @@ DEFAULT_SETTINGS = {
         ],
         "Notice of Response": ["notice of response"],
         "AFCA Submission": ["afca submission", "submission to afca"],
-        "Letter of Engagement": ["letter of engagement", "engagement letter"],
+        "Letter of Engagement": ["letter of engagement", "engagement letter", "engagement"],
         "Building Report": ["building report", "building inspection"],
         "Supplementary Report": ["supplementary report", "supplementary assessment"],
         "Supplementary Technical Assessment Report": [
@@ -267,11 +274,13 @@ DEFAULT_SETTINGS = {
             "engineers initial visual report", "engineers request for information",
             "engineering services",
         ],
+        "TB32 Technical Bulletin": ["tb-32", "tb 32", "tb32", "technical bulletin"],
+        "Desktop Report": ["desktop report", "desktop assessment", "desktop review"],
         "Hail Report": ["hail report", "hail damage", "hail assessment"],
         "Quote": ["quote", "quotation", "estimate"],
         "Weather Pack": ["weather pack", "weather report", "weather data"],
         "Agent Authority Form": ["authority and access form", "aaf"],
-        "Delegation of Authority": ["delegation of authority", "delegation authority", "doa"],
+        "Delegation of Authority": ["delegation of authority", "delegation authority"],
         "Timeline": ["timeline", "chronology", "file note", "file notes"],
         "Request for Information": ["request for information", "rfi"],
         "Written Preliminary Assessment": [
@@ -289,6 +298,8 @@ DEFAULT_SETTINGS = {
         "Supplementary Report": True,
         "Supplementary Technical Assessment Report": True,
         "Engineering Report": True,
+        "TB32 Technical Bulletin": False,
+        "Desktop Report": True,
         "Hail Report": True,
         "Quote": True,
         "IDR FDL": True,

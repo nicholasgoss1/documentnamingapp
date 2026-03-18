@@ -3,6 +3,27 @@
 ================================================================================
 
 
+v1.4.0 - 18 Mar 2026
+---------------------
+NEW
+- Added "TB32 Technical Bulletin" document type with keywords (tb-32, tb 32,
+  tb32, technical bulletin)
+- Added "Desktop Report" document type with keywords (desktop report, desktop
+  assessment, desktop review)
+- Added Tomkat Roofing as a recognised FF entity with aliases
+- Added AAMI → AAI entity alias (AAMI documents now show ENTITY = AAI)
+
+FIXED
+- Engagement Letter no longer misclassified as Delegation of Authority: removed
+  overly broad "doa" keyword, added "engagement" keyword for Letter of
+  Engagement, and added conflict resolution (Engagement beats DOA)
+- Roof reports from recognised roofing companies (e.g. Tomkat Roofing) now
+  correctly classified as WHO = FF instead of Complainant
+
+IMPROVED
+- Letter of Engagement beats Delegation of Authority in conflict resolution
+
+
 v1.3.1 - 18 Mar 2026
 ---------------------
 NEW

@@ -282,6 +282,9 @@ def infer_what(page1_text: str, full_text: str, filename: str,
         # pricing/cost information that triggers Quote, but the engineering
         # keywords indicate the document is a report, not a quote.
         "Quote": "Engineering Report",
+        # Letter of Engagement beats Delegation of Authority: engagement
+        # documents may mention delegation but are primarily engagement letters.
+        "Delegation of Authority": "Letter of Engagement",
     }
     if best_match in conflict_overrides:
         override_label = conflict_overrides[best_match]
