@@ -214,6 +214,8 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
         record.entity = "DOA"
     if "agent authority form" in what_lower:
         record.entity = "AAF"
+    if "tb32 technical bulletin" in what_lower:
+        record.entity = "BlueScope"
 
     # Special handling for quotes with amounts
     if record.what and "quote" in record.what.lower():

@@ -140,8 +140,13 @@ def infer_who(page1_text: str, full_text: str, filename: str,
 
 
 def _find_entities_in_text(text: str, sorted_keys: list, search_map: dict) -> list:
-    """Find all known entities in a text string. Returns list of (canonical_name, position)."""
-    text_lower = text.lower()
+    """Find all known entities in a text string. Returns list of (canonical_name, position).
+
+    Normalises whitespace before matching so that PDF line-breaks within
+    entity names (e.g. "Certified Building Inspection\\nServices") don't
+    prevent detection.
+    """
+    text_lower = re.sub(r'\s+', ' ', text.lower())
     found = []
     for key in sorted_keys:
         if key in text_lower:

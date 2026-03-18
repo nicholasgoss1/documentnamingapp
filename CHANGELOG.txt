@@ -3,6 +3,18 @@
 ================================================================================
 
 
+v1.5.1 - 18 Mar 2026
+---------------------
+FIXED
+- Entity detection now normalises whitespace before matching: PDF line breaks
+  within multi-word entity names (e.g. "Certified Building Inspection\nServices")
+  no longer prevent detection. This was the root cause of the Pre Purchase
+  Inspection Report entity being blank despite the name appearing on page 1.
+- TB32 Technical Bulletin now always shows ENTITY = BlueScope (forced override)
+- Added BlueScope as a recognised FF entity with aliases (BlueScope Steel,
+  BlueScope Steel Limited)
+
+
 v1.5.0 - 18 Mar 2026
 ---------------------
 FIXED

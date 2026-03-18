@@ -8,7 +8,7 @@ from pathlib import Path
 from copy import deepcopy
 
 APP_NAME = "ClaimFileRenamer"
-APP_VERSION = "1.5.0"
+APP_VERSION = "1.5.1"
 
 
 def get_app_data_dir() -> Path:
@@ -76,7 +76,7 @@ DEFAULT_SETTINGS = {
             "Clear Engineering Services", "Australian Building & Construction",
             "Tomkat Roofing", "MCS Group",
             "Certified Building Inspection Services",
-            "QBE", "WeatherWatch", "BoM",
+            "BlueScope", "QBE", "WeatherWatch", "BoM",
             # General insurers
             "AAI", "Suncorp", "IAG", "Insurance Australia Limited",
             "CGU", "Allianz", "Allianz Australia",
@@ -203,6 +203,8 @@ DEFAULT_SETTINGS = {
         "Certified Pest and Building": "Certified Building Inspection Services",
         "Certified Pest & Building": "Certified Building Inspection Services",
         "certifiedbuildinginspection": "Certified Building Inspection Services",
+        "BlueScope Steel": "BlueScope",
+        "BlueScope Steel Limited": "BlueScope",
         "Tomkat Roofing Pty Ltd": "Tomkat Roofing",
         "tomkatroofing": "Tomkat Roofing",
         "RACQ Insurance Limited": "RACQ Insurance",
@@ -224,7 +226,7 @@ DEFAULT_SETTINGS = {
         "Morse Building Consultants", "Clear Engineering Services",
         "Australian Building & Construction", "Tomkat Roofing",
         "MCS Group", "Certified Building Inspection Services",
-        "RCC National", "QBE", "RACQ Insurance", "AFCA",
+        "BlueScope", "RCC National", "QBE", "RACQ Insurance", "AFCA",
         "ACB", "AusCoast", "RUCA", "Balmoral", "Patcol",
         "WeatherWatch", "BoM", "COI"
     ],
@@ -328,7 +330,7 @@ DEFAULT_SETTINGS = {
         "Engineering Report": True,
         "Pre Purchase Inspection Report": True,
         "Claims Team FDL": True,
-        "TB32 Technical Bulletin": False,
+        "TB32 Technical Bulletin": True,
         "Desktop Report": True,
         "Hail Report": True,
         "Quote": True,
