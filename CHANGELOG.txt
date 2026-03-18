@@ -3,6 +3,22 @@
 ================================================================================
 
 
+v1.5.3 - 18 Mar 2026
+---------------------
+FIXED
+- Root cause fix for entity detection: added Unicode NFKC normalisation to
+  decompose PDF ligature characters (ﬁ→fi, ﬂ→fl, ﬀ→ff, etc.). PDFs
+  frequently encode "fi" as the single ligature glyph U+FB01, causing
+  "Certified" to be stored as "Certi\uFB01ed" which silently broke all
+  substring matching against entity names. NFKC normalisation decomposes
+  these back to standard characters.
+- Changed PyMuPDF text extraction flags to clear TEXT_PRESERVE_LIGATURES,
+  so ligatures are decomposed at extraction time as well (defence in depth).
+- Added word-level text extraction fallback: if standard text extraction
+  and deep scan both fail to find an entity, a word-by-word extraction pass
+  captures text that may be missed due to unusual font encodings or PDF
+  structure.
+
 v1.5.2 - 18 Mar 2026
 ---------------------
 FIXED

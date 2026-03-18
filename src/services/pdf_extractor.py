@@ -4,10 +4,18 @@ All processing is local. No network calls.
 """
 import hashlib
 import re
+import unicodedata
 from pathlib import Path
 from typing import Optional
 
 import fitz  # PyMuPDF
+
+# Text extraction flags: exclude TEXT_PRESERVE_LIGATURES so that PyMuPDF
+# decomposes ligature characters (ﬁ→fi, ﬂ→fl) at extraction time.
+# Combined with NFKC normalisation in _clean_text, this ensures entity
+# names like "Certified" are always searchable even when PDFs embed
+# ligature glyphs.
+_TEXT_FLAGS = fitz.TEXT_PRESERVE_WHITESPACE
 
 # Unicode directional formatting characters that some PDFs embed around
 # every word.  These are invisible but break substring matching.
@@ -18,10 +26,18 @@ _UNICODE_JUNK = re.compile(
 
 
 def _clean_text(text: str) -> str:
-    """Strip Unicode directional/formatting/invisible characters from extracted text.
+    """Normalise PDF-extracted text for reliable entity/keyword matching.
 
-    Replaces non-breaking spaces with regular spaces so entity matching works.
+    1. NFKC normalisation decomposes ligatures (ﬁ→fi, ﬂ→fl, ﬀ→ff, etc.)
+       and width variants that PDFs commonly embed in font encodings.
+    2. Strips invisible Unicode formatting characters (zero-width spaces,
+       directional marks, BOM) and replaces non-breaking spaces with
+       regular spaces.
+    3. Collapses runs of whitespace.
     """
+    # Decompose ligatures and compatibility characters
+    text = unicodedata.normalize('NFKC', text)
+    # Replace invisible/formatting chars with spaces
     text = _UNICODE_JUNK.sub(' ', text)
     # Collapse multiple spaces to one
     text = re.sub(r'  +', ' ', text)
@@ -36,7 +52,7 @@ def extract_text(file_path: str, max_pages: int = 5) -> str:
         text_parts = []
         for i in range(min(max_pages, len(doc))):
             page = doc[i]
-            text_parts.append(page.get_text("text"))
+            text_parts.append(page.get_text("text", flags=_TEXT_FLAGS))
         return _clean_text("\n".join(text_parts))
     except Exception:
         return ""
@@ -51,7 +67,7 @@ def extract_page1_text(file_path: str) -> str:
     try:
         doc = fitz.open(file_path)
         if len(doc) > 0:
-            text = doc[0].get_text("text")
+            text = doc[0].get_text("text", flags=_TEXT_FLAGS)
         else:
             text = ""
         return _clean_text(text)
@@ -123,7 +139,7 @@ def extract_page1_spatial(file_path: str) -> dict:
         bottom_cutoff = height * 0.75
         mid_x = width * 0.5
 
-        blocks = page.get_text("blocks")  # list of (x0, y0, x1, y1, text, block_no, block_type)
+        blocks = page.get_text("blocks", flags=_TEXT_FLAGS)
 
         top_left_parts = []
         top_right_parts = []
@@ -164,6 +180,30 @@ def extract_page1_spatial(file_path: str) -> dict:
         if doc:
             doc.close()
     return regions
+
+
+def extract_page1_rawtext(file_path: str) -> str:
+    """Extract text from page 1 using word-by-word extraction.
+
+    This is a fallback for PDFs where standard text extraction misses
+    content due to unusual font encodings or PDF structure.  It extracts
+    individual words (via get_text("words")) and joins them with spaces.
+    """
+    doc = None
+    try:
+        doc = fitz.open(file_path)
+        if len(doc) == 0:
+            return ""
+        page = doc[0]
+        words = page.get_text("words", flags=_TEXT_FLAGS)
+        # words is list of (x0, y0, x1, y1, word, block_no, line_no, word_no)
+        raw = " ".join(w[4] for w in words if w[4].strip())
+        return _clean_text(raw)
+    except Exception:
+        return ""
+    finally:
+        if doc:
+            doc.close()
 
 
 def compute_file_hash(file_path: str) -> str:

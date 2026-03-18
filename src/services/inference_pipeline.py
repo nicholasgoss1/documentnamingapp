@@ -10,6 +10,7 @@ from src.core.models import DocumentRecord, DuplicateStatus
 from src.core.settings import Settings
 from src.services.pdf_extractor import (
     extract_text, extract_page1_text, extract_page1_spatial,
+    extract_page1_rawtext,
     compute_file_hash, compute_content_hash
 )
 from src.services.classifier import (
@@ -57,6 +58,15 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
             record.page1_text, deep_text,
             record.original_filename, settings, record.page1_regions
         )
+    # Last resort: word-level extraction captures text that standard
+    # extraction misses (unusual font encodings, ligatures, etc.)
+    if not entity:
+        raw_text = extract_page1_rawtext(file_path)
+        if raw_text:
+            entity, entity_conf = infer_entity(
+                raw_text, raw_text,
+                record.original_filename, settings, record.page1_regions
+            )
     record.entity = normalize_entity(entity, settings)
 
     # Infer WHO
