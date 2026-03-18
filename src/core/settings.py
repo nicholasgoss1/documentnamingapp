@@ -8,7 +8,7 @@ from pathlib import Path
 from copy import deepcopy
 
 APP_NAME = "ClaimFileRenamer"
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.3.1"
 
 
 def get_app_data_dir() -> Path:
@@ -65,12 +65,14 @@ DEFAULT_SETTINGS = {
             "youi", "zurich", "chubb", "aig", "aami",
             "gio", "nrma", "bupa", "medibank", "nib",
             "budget direct", "racv", "racq",
-            "engineering services", "clear engineering"
+            "engineering services", "clear engineering",
+            "australian building & construction", "australian building and construction"
         ],
         "complainant_entities": ["ClaimsCo", "ACB", "AusCoast", "RUCA", "Balmoral", "Patcol"],
         "ff_entities": [
             "Sedgwick", "Campbell Constructions", "Morse Building Consultants",
-            "Clear Engineering Services", "QBE", "WeatherWatch", "BoM",
+            "Clear Engineering Services", "Australian Building & Construction",
+            "QBE", "WeatherWatch", "BoM",
             # General insurers
             "AAI", "Suncorp", "IAG", "Insurance Australia Limited",
             "CGU", "Allianz", "Allianz Australia",
@@ -188,10 +190,15 @@ DEFAULT_SETTINGS = {
         "RCC National Pty": "RCC National",
         "RCC": "RCC National",
         "RACQ Insurance Limited": "RACQ Insurance",
+        "Australian Building & Construction Group Pty Ltd": "Australian Building & Construction",
+        "Australian Building & Construction Group": "Australian Building & Construction",
+        "Australian Building and Construction Group": "Australian Building & Construction",
+        "Australian Building and Construction": "Australian Building & Construction",
+        "Australian Building & Construction Pty Ltd": "Australian Building & Construction",
         "Clear Engineering Services Australia": "Clear Engineering Services",
         "Clear Engineering Services Australia Pty Ltd": "Clear Engineering Services",
         "Clear Engineering": "Clear Engineering Services",
-        "CES": "Clear Engineering Services",
+        "clearengineeringservices": "Clear Engineering Services",
         "Claims Made Easy": "ClaimsCo",
         "CLAIMS MADE EASY": "ClaimsCo",
         "claimsco.com.au": "ClaimsCo"
@@ -199,6 +206,7 @@ DEFAULT_SETTINGS = {
     "preferred_entities": [
         "ClaimsCo", "Campbell Constructions", "Sedgwick",
         "Morse Building Consultants", "Clear Engineering Services",
+        "Australian Building & Construction",
         "RCC National", "QBE", "RACQ Insurance", "AFCA",
         "ACB", "AusCoast", "RUCA", "Balmoral", "Patcol",
         "WeatherWatch", "BoM", "COI"

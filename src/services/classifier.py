@@ -271,16 +271,25 @@ def infer_what(page1_text: str, full_text: str, filename: str,
                 best_match = label
                 best_specificity = specificity
 
-    # Conflict resolution: IDR FDL always beats Information Sheet.
-    # Letters about complaint decisions contain words like "complaint" which
-    # trigger Information Sheet, but if IDR FDL keywords also match, the
-    # document is a final decision letter, not an information sheet.
-    if best_match == "Information Sheet":
-        idr_keywords = doc_keywords.get("IDR FDL", [])
-        for kw in idr_keywords:
+    # Conflict resolution rules: some document types should always win over
+    # others when both match.
+    conflict_overrides = {
+        # IDR FDL beats Information Sheet: complaint decision letters contain
+        # "complaint" which triggers Info Sheet, but IDR keywords mean it's
+        # actually a final decision letter.
+        "Information Sheet": "IDR FDL",
+        # Engineering Report beats Quote: engineering reports may contain
+        # pricing/cost information that triggers Quote, but the engineering
+        # keywords indicate the document is a report, not a quote.
+        "Quote": "Engineering Report",
+    }
+    if best_match in conflict_overrides:
+        override_label = conflict_overrides[best_match]
+        override_keywords = doc_keywords.get(override_label, [])
+        for kw in override_keywords:
             kw_lower = kw.lower()
             if kw_lower in filename_lower or kw_lower in text_lower or kw_lower in full_lower:
-                best_match = "IDR FDL"
+                best_match = override_label
                 break
 
     if best_match:

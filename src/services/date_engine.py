@@ -37,7 +37,7 @@ MONTH_MAP = {
 # Document types that use specific date rules
 LETTER_TYPES = [
     "site report", "assessment report", "building report", "roof report",
-    "hail report", "progress report", "supplementary report",
+    "hail report", "engineering report", "progress report", "supplementary report",
     "supplementary technical assessment report", "notice of response",
     "idr fdl", "request for information", "written preliminary assessment",
     "initial claims advice", "weather pack"

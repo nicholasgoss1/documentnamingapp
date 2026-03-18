@@ -3,6 +3,21 @@
 ================================================================================
 
 
+v1.3.1 - 18 Mar 2026
+---------------------
+NEW
+- Added Australian Building & Construction (ABC) as a recognised FF entity
+  with aliases (Group Pty Ltd, Group, and "and" variants)
+
+IMPROVED
+- Engineering Report now beats Quote in conflict resolution (engineering
+  reports containing pricing/cost info were being misclassified as Quotes)
+- Engineering Report added to date engine letter types so dates are searched
+  across all pages, not just page 1 (fixes missed dates on page 2 cover sheets)
+- Removed short "CES" alias to prevent false entity matches on words like
+  "processes"; full "Clear Engineering Services" and URL form still matched
+
+
 v1.3.0 - 17 Mar 2026
 ---------------------
 NEW
