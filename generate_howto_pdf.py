@@ -223,27 +223,10 @@ def build():
     # === 1. GETTING THE APP ===
     p.h1("1. Getting the App")
 
-    p.h2("Option A \u2014 Use the Built Executable (Recommended)")
-    p.bullet("Download the ZIP of the project from GitHub:")
-    p.body("Go to https://github.com/nicholasgoss1/documentnamingapp", indent=18)
-    p.body("Switch to the branch claude/generate-runnable-project-HDg4G", indent=18)
-    p.body("Click the green Code button \u2192 Download ZIP", indent=18)
-    p.bullet("Extract the ZIP to a folder on your PC (e.g. C:\\ClaimFileRenamer)")
-    p.bullet("Open a Command Prompt in that folder and run:")
-    p.code_block("packaging\\build_windows.bat")
-    p.body("This creates dist\\ClaimFileRenamer\\ClaimFileRenamer.exe.", indent=18)
+    p.bullet("Download the ClaimFileRenamer.exe from Google Drive:")
+    p.body("https://drive.google.com/drive/folders/1EtN9WHXr9H8pWxKYGhoxzCm8J4mm4U0x", indent=18)
+    p.bullet("Save the .exe file to a folder on your PC (e.g. C:\\ClaimFileRenamer).")
     p.bullet("Double-click ClaimFileRenamer.exe to launch.")
-
-    p.h2("Option B \u2014 Run from Source (Developer)")
-    p.bullet("Install Python 3.12+ from python.org")
-    p.bullet("Download or clone the repo as above")
-    p.bullet("Open a Command Prompt in the project folder and run:")
-    p.code_block(
-        "python -m venv venv\n"
-        "venv\\Scripts\\activate\n"
-        "pip install -r requirements.txt\n"
-        "python main.py"
-    )
 
     # === 2. PREPARE FILES ===
     p.h1("2. Prepare Your Files")
@@ -395,7 +378,7 @@ def build():
     p.table(
         ["Problem", "Solution"],
         [
-            ["App won't start", "Make sure Python 3.12+ is installed, or use the built .exe"],
+            ["App won't start", "Re-download the .exe and try again; check antivirus hasn't quarantined it"],
             ["\"No text extracted\"", "The PDF is a scanned image \u2014 edit fields manually"],
             ["Confidence is low", "Check Settings \u2192 entity aliases and doc type keywords"],
             ["Rename fails", "Check error \u2014 file may be open or path too long"],
