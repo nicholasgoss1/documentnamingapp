@@ -169,6 +169,8 @@ class MainWindow(QMainWindow):
         header.setSectionResizeMode(5, QHeaderView.Stretch)
         for col in range(6, 10):
             header.setSectionResizeMode(col, QHeaderView.ResizeToContents)
+        # Hide Confidence Reason column — too noisy for end users
+        self._table.setColumnHidden(7, True)
 
         left_layout.addWidget(self._table, 1)
 

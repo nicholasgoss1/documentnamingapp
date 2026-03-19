@@ -3,6 +3,13 @@
 ================================================================================
 
 
+v1.5.5 - 19 Mar 2026
+---------------------
+CHANGED
+- Hidden the Confidence Reason column from the table to reduce visual clutter.
+  Confidence score column remains visible.
+
+
 v1.5.4 - 19 Mar 2026
 ---------------------
 FIXED
