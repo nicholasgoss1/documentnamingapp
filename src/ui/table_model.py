@@ -150,7 +150,8 @@ class DocumentTableModel(QAbstractTableModel):
         else:
             return False
 
-        # Rebuild proposed filename (preserving DUPLICATE suffix)
+        # Manual edit overrides duplicate detection — rebuild from fields
+        rec.duplicate_status = DuplicateStatus.NONE
         _rebuild_filename(rec)
         # Emit change for the whole row
         self.dataChanged.emit(
@@ -186,6 +187,7 @@ class DocumentTableModel(QAbstractTableModel):
                     rec.entity = value
                 elif col == 4:
                     rec.what = value
+                rec.duplicate_status = DuplicateStatus.NONE
                 _rebuild_filename(rec)
         if rows:
             self.dataChanged.emit(
@@ -211,6 +213,7 @@ class DocumentTableModel(QAbstractTableModel):
                 rec = self._records[row]
                 if find.lower() in rec.what.lower():
                     rec.what = rec.what.replace(find, replace)
+                    rec.duplicate_status = DuplicateStatus.NONE
                     _rebuild_filename(rec)
         if rows:
             self.dataChanged.emit(

@@ -3,6 +3,18 @@
 ================================================================================
 
 
+v1.5.4 - 19 Mar 2026
+---------------------
+FIXED
+- Manually editing a field (WHO, DATE, ENTITY, WHAT) on a duplicate-flagged
+  row now correctly rebuilds the proposed filename from the edited values.
+  Previously the filename stayed as "DUPLICATE.pdf" even after editing because
+  the duplicate status was never cleared on manual edits. This also caused
+  validation errors ("Duplicate target name") when trying to rename.
+- Same fix applied to bulk field edits (Set WHO/Entity/WHAT/Date buttons)
+  and Find/Replace operations.
+
+
 v1.5.3 - 18 Mar 2026
 ---------------------
 FIXED

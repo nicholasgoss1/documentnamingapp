@@ -8,7 +8,7 @@ from pathlib import Path
 from copy import deepcopy
 
 APP_NAME = "ClaimFileRenamer"
-APP_VERSION = "1.5.3"
+APP_VERSION = "1.5.4"
 
 
 def get_app_data_dir() -> Path:
