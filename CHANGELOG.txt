@@ -3,6 +3,37 @@
 ================================================================================
 
 
+v1.5.8 - 23 Mar 2026
+---------------------
+ADDED
+- New "Final Report" document type for loss adjuster final reports (e.g.
+  Sedgwick Final Report). Previously these were misclassified as Claims Team
+  FDL because "claim decision" appeared in the report text.
+
+FIXED
+- Sedgwick Final Reports no longer misclassified as Claims Team FDL. Added
+  conflict resolution: Claims Team FDL loses to Final Report when both match.
+- ClaimsCo-authored Notice of Response to AFCA now correctly identified:
+  WHO=Complainant, ENTITY=ClaimsCo, WHAT="Notice of Response". Previously
+  showed as FF / Notice of Response from QBE because QBE was mentioned in text.
+- Added "the financial firm's" as ClaimsCo authorship detection phrase (used
+  in complainant-side AFCA submissions referring to the insurer in third person).
+- "Information Request Response" documents now classified as Request for
+  Information instead of PDS.
+- Date engine now skips "Date of Loss", "Date of Incident" and similar event
+  date labels when inferring document dates for letters and reports. Prevents
+  picking up the loss date (e.g. 24.12.2023) instead of the actual letter date.
+- Date engine rejects pre-2000 dates for letter/report types and scans deeper
+  into the document for the correct date (e.g. Morse Building report now picks
+  up 26.07.2024 from page 2 instead of 07.12.1969 construction date).
+- AFCA-authored documents now always show ENTITY=AFCA.
+- Certificate of Insurance no longer overrides IDR FDL, Notice of Response,
+  or Request for Information classifications.
+- Delegation of Authority no longer overrides AFCA Submission classification.
+- Added "complaint lodgement" and "lodgement of a formal complaint" keywords
+  for AFCA Submission detection.
+
+
 v1.5.7 - 19 Mar 2026
 ---------------------
 FIXED

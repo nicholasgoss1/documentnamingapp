@@ -278,32 +278,30 @@ def infer_what(page1_text: str, full_text: str, filename: str,
 
     # Conflict resolution rules: some document types should always win over
     # others when both match.
+    # Conflict resolution: when the best match is a "weak" type that often
+    # appears as a reference in other document types, check if a stronger
+    # type's keywords also appear. Values are lists of potential winners
+    # checked in order — first match wins.
     conflict_overrides = {
-        # IDR FDL beats Information Sheet: complaint decision letters contain
-        # "complaint" which triggers Info Sheet, but IDR keywords mean it's
-        # actually a final decision letter.
-        "Information Sheet": "IDR FDL",
-        # Engineering Report beats Quote: engineering reports may contain
-        # pricing/cost information that triggers Quote, but the engineering
-        # keywords indicate the document is a report, not a quote.
-        "Quote": "Engineering Report",
-        # Letter of Engagement beats Delegation of Authority: engagement
-        # documents may mention delegation but are primarily engagement letters.
-        "Delegation of Authority": "Letter of Engagement",
-        # Claims Team FDL beats PDS: claim decision letters reference the
-        # PDS but the document itself is a final decision, not a PDS.
-        "PDS": "Claims Team FDL",
-        # TB32 Technical Bulletin beats Hail Report: TB32 bulletins discuss
-        # hail damage but are reference documents, not hail reports.
-        "Hail Report": "TB32 Technical Bulletin",
+        "Information Sheet": ["IDR FDL"],
+        "Quote": ["Engineering Report"],
+        "Delegation of Authority": ["Letter of Engagement", "AFCA Submission"],
+        "PDS": ["Claims Team FDL", "Request for Information"],
+        "Hail Report": ["TB32 Technical Bulletin"],
+        "Certificate of Insurance": ["IDR FDL", "Notice of Response", "Request for Information"],
+        "Claims Team FDL": ["Final Report"],
     }
     if best_match in conflict_overrides:
-        override_label = conflict_overrides[best_match]
-        override_keywords = doc_keywords.get(override_label, [])
-        for kw in override_keywords:
-            kw_lower = kw.lower()
-            if kw_lower in filename_lower or kw_lower in text_lower or kw_lower in full_lower:
-                best_match = override_label
+        for override_label in conflict_overrides[best_match]:
+            override_keywords = doc_keywords.get(override_label, [])
+            matched = False
+            for kw in override_keywords:
+                kw_lower = kw.lower()
+                if kw_lower in filename_lower or kw_lower in text_lower or kw_lower in full_lower:
+                    best_match = override_label
+                    matched = True
+                    break
+            if matched:
                 break
 
     if best_match:

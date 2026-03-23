@@ -8,7 +8,7 @@ from pathlib import Path
 from copy import deepcopy
 
 APP_NAME = "ClaimFileRenamer"
-APP_VERSION = "1.5.7"
+APP_VERSION = "1.5.8"
 
 
 def get_app_data_dir() -> Path:
@@ -242,6 +242,7 @@ DEFAULT_SETTINGS = {
         "Supplementary Report", "Supplementary Technical Assessment Report",
         "Pre Purchase Inspection Report",
         "Engineering Report", "TB32 Technical Bulletin", "Desktop Report",
+        "Final Report",
         "Hail Report", "Quote", "Weather Pack", "Agent Authority Form",
         "Delegation of Authority", "Information Sheet",
         "Timeline",
@@ -286,7 +287,11 @@ DEFAULT_SETTINGS = {
             "our final decision",
         ],
         "Notice of Response": ["notice of response"],
-        "AFCA Submission": ["afca submission", "submission to afca"],
+        "AFCA Submission": [
+            "afca submission", "submission to afca",
+            "lodgement of a formal complaint",
+            "complaint lodgement",
+        ],
         "Letter of Engagement": ["letter of engagement", "engagement letter", "engagement"],
         "Building Report": ["building report", "building inspection"],
         "Supplementary Report": ["supplementary report", "supplementary assessment"],
@@ -307,13 +312,17 @@ DEFAULT_SETTINGS = {
         ],
         "TB32 Technical Bulletin": ["tb-32", "tb 32", "tb32", "technical bulletin"],
         "Desktop Report": ["desktop report", "desktop assessment", "desktop review"],
+        "Final Report": ["final report"],
         "Hail Report": ["hail report", "hail damage", "hail assessment"],
         "Quote": ["quote", "quotation", "estimate"],
         "Weather Pack": ["weather pack", "weather report", "weather data"],
         "Agent Authority Form": ["authority and access form", "aaf"],
         "Delegation of Authority": ["delegation of authority", "delegation authority"],
         "Timeline": ["timeline", "chronology", "file note", "file notes"],
-        "Request for Information": ["request for information", "rfi"],
+        "Request for Information": [
+            "request for information", "rfi",
+            "information request response",
+        ],
         "Written Preliminary Assessment": [
             "written preliminary assessment", "preliminary assessment"
         ]
@@ -333,6 +342,7 @@ DEFAULT_SETTINGS = {
         "Claims Team FDL": True,
         "TB32 Technical Bulletin": True,
         "Desktop Report": True,
+        "Final Report": True,
         "Hail Report": True,
         "Quote": True,
         "IDR FDL": True,

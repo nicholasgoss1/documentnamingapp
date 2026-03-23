@@ -165,6 +165,7 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
         "claims made easy",
         "desired outcome",
         "resolution of claim settlement",
+        "the financial firm's",
     ]
     is_from_claimsco = (
         "claimsco" in top_right
@@ -181,11 +182,16 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
             "afca" in top_left,
             "australian financial complaints authority" in page1_normalized,
             "afca" in filename_lower,
+            "afca case number" in page1_normalized,
         ]
         if any(afca_indicators) and what_lower not in ["claimsco letter to idr"]:
             record.who = "Complainant"
-            record.what = "ClaimsCo Letter to IDR"
             record.entity = "ClaimsCo"
+            # Keep "Notice of Response" as-is; override other misclassifications
+            if "notice of response" in what_lower:
+                record.what = "Notice of Response"
+            else:
+                record.what = "ClaimsCo Letter to IDR"
 
     # If authored by ClaimsCo, set entity to ClaimsCo (logo may be image-only)
     if is_from_claimsco and record.entity != "ClaimsCo":
@@ -226,6 +232,10 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
         record.entity = "AAF"
     if "tb32 technical bulletin" in what_lower:
         record.entity = "BlueScope"
+
+    # AFCA-authored documents should always show ENTITY = AFCA
+    if record.who == "AFCA" and not record.entity:
+        record.entity = "AFCA"
 
     # Special handling for quotes with amounts
     if record.what and "quote" in record.what.lower():

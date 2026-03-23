@@ -38,6 +38,7 @@ MONTH_MAP = {
 LETTER_TYPES = [
     "site report", "assessment report", "building report", "roof report",
     "hail report", "engineering report", "desktop report",
+    "final report",
     "progress report", "supplementary report",
     "supplementary technical assessment report", "notice of response",
     "idr fdl", "claims team fdl",
@@ -99,22 +100,52 @@ def parse_date(text: str, pattern_type: str, match) -> Tuple[str, bool]:
     return "", False
 
 
-def extract_all_dates(text: str) -> list:
-    """Extract all date candidates from text. Returns list of (date_str, is_partial, position)."""
+# Labels that introduce a non-letter date (e.g. "Date of Loss: 24 Dec 2023").
+# Dates following these labels describe the event, NOT the document date.
+_EVENT_DATE_LABELS = re.compile(
+    r'(?:date\s+of\s+(?:loss|incident|event|damage|claim)|'
+    r'date\s+(?:notified|reported|lodged)|'
+    r'incident\s+date|loss\s+date|event\s+date|'
+    r'originally\s+constructed|constructed\s+in)\s*[:.]?\s*$',
+    re.IGNORECASE,
+)
+
+
+def extract_all_dates(text: str, exclude_event_dates: bool = False) -> list:
+    """Extract all date candidates from text. Returns list of (date_str, is_partial, position).
+
+    If exclude_event_dates is True, dates immediately preceded by labels like
+    "Date of Loss:", "Date of Incident:", "Incident date:" are skipped.
+    """
     results = []
     for pattern, ptype in DATE_PATTERNS:
         for match in re.finditer(pattern, text, re.IGNORECASE):
             date_str, is_partial = parse_date(text, ptype, match)
-            if date_str:  # Skip invalid/empty dates
-                results.append((date_str, is_partial, match.start()))
+            if not date_str:
+                continue
+            # Optionally skip event/loss dates
+            if exclude_event_dates:
+                prefix = text[max(0, match.start() - 60):match.start()]
+                if _EVENT_DATE_LABELS.search(prefix):
+                    continue
+            results.append((date_str, is_partial, match.start()))
     return results
 
 
-def find_page1_top_date(page1_text: str) -> Tuple[str, bool]:
+def _date_year(date_str: str) -> int:
+    """Extract the year from a date string like '26.07.2024' or '07.2024'."""
+    parts = date_str.split('.')
+    try:
+        return int(parts[-1])
+    except (ValueError, IndexError):
+        return 0
+
+
+def find_page1_top_date(page1_text: str, exclude_event_dates: bool = False) -> Tuple[str, bool]:
     """Find the first date in the top portion of page 1."""
     # Consider the top ~40 lines or first 2000 chars
     top_text = page1_text[:2000]
-    dates = extract_all_dates(top_text)
+    dates = extract_all_dates(top_text, exclude_event_dates=exclude_event_dates)
     if dates:
         return dates[0][0], dates[0][1]
     return "", False
@@ -222,14 +253,21 @@ def infer_date(doc_type: str, page1_text: str, full_text: str,
 
     # 1. Formal letters and reports
     if any(t in doc_lower for t in LETTER_TYPES):
-        date, is_partial = find_page1_top_date(page1_text)
-        if date:
+        # Look for the letter date, excluding event dates (Date of Loss etc.)
+        date, is_partial = find_page1_top_date(page1_text, exclude_event_dates=True)
+        if date and _date_year(date) >= 2000:
             return date, 18 if not is_partial else 12
+        # If page 1 date is missing or too old (cover page), check full text
+        # (the actual letter date is often on page 2 for reports with cover pages)
+        dates = extract_all_dates(full_text[:6000], exclude_event_dates=True)
+        recent = [d for d in dates if _date_year(d[0]) >= 2000]
+        if recent:
+            return recent[0][0], 16 if not recent[0][1] else 10
         # Check for "Printed on DD/MM/YYYY" (common in site reports at bottom)
         printed_date = find_printed_on_date(full_text)
         if printed_date:
             return printed_date, 16
-        # fallback: any date in full text
+        # fallback: any date in full text (including event dates)
         dates = extract_all_dates(full_text)
         if dates:
             return dates[0][0], 8
