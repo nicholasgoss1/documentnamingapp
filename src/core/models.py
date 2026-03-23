@@ -108,8 +108,6 @@ class DocumentRecord:
             parts.append(self.entity)
         if self.what:
             parts.append(self.what)
-        if self.is_unsure:
-            parts.append("UNSURE")
         name = " - ".join(parts)
         if not name:
             name = self.original_filename

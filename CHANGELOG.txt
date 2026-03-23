@@ -3,6 +3,13 @@
 ================================================================================
 
 
+v1.5.9 - 23 Mar 2026
+---------------------
+CHANGED
+- Removed "UNSURE" suffix from proposed filenames. Low-confidence files are
+  still flagged internally but no longer have UNSURE appended to the filename.
+
+
 v1.5.8 - 23 Mar 2026
 ---------------------
 ADDED
