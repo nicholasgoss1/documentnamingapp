@@ -68,13 +68,17 @@ def detect_duplicates(records: List[DocumentRecord]) -> List[DocumentRecord]:
     # Catches cases where files are different PDFs of the same document
     # (e.g. one filename contains "DUPLICATE" or a copy number).
     # Only compare records that have at least WHO and WHAT populated.
+    # IMPORTANT: include ALL records in field groups (even already-flagged
+    # ones) so a new record with the same fields as an already-flagged
+    # exact duplicate also gets caught. Only CHANGE status on NONE records.
     field_groups: Dict[str, List[int]] = defaultdict(list)
     for i, rec in enumerate(records):
-        if rec.duplicate_status != DuplicateStatus.NONE:
-            continue
         what_norm = _normalize_what_for_comparison(rec.what)
         if not rec.who and not what_norm:
             continue  # Skip records with no meaningful fields to compare
+        # Skip records whose fields are literally "DUPLICATE"
+        if (rec.who or "").upper() == "DUPLICATE":
+            continue
         key = f"{(rec.who or '').lower()}|{(rec.date or '').lower()}|{(rec.entity or '').lower()}|{what_norm}"
         field_groups[key].append(i)
 
@@ -97,8 +101,6 @@ def detect_duplicates(records: List[DocumentRecord]) -> List[DocumentRecord]:
     ]
     one_per_claim_groups: Dict[str, List[int]] = defaultdict(list)
     for i, rec in enumerate(records):
-        if rec.duplicate_status != DuplicateStatus.NONE:
-            continue
         what_norm = _normalize_what_for_comparison(rec.what)
         if not any(t in what_norm for t in ONE_PER_CLAIM_TYPES):
             continue
@@ -128,6 +130,21 @@ def detect_duplicates(records: List[DocumentRecord]) -> List[DocumentRecord]:
             for idx in indices[1:]:
                 if records[idx].proposed_filename != "DUPLICATE.pdf":
                     records[idx].proposed_filename = "DUPLICATE.pdf"
+
+    # 5. Catch-all: rows whose fields literally contain "DUPLICATE"
+    # These are files from a previous session that were renamed to
+    # "DUPLICATE.pdf" and then reloaded. Flag them so the user knows
+    # they need attention.
+    for i, rec in enumerate(records):
+        if rec.duplicate_status != DuplicateStatus.NONE:
+            continue
+        dup_fields = sum(
+            1 for v in [rec.who, rec.date, rec.entity, rec.what]
+            if v and v.upper() == "DUPLICATE"
+        )
+        if dup_fields >= 2:
+            rec.duplicate_status = DuplicateStatus.LIKELY_DUPLICATE
+            rec.proposed_filename = "DUPLICATE.pdf"
 
     return records
 

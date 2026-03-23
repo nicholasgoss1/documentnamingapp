@@ -3,6 +3,19 @@
 ================================================================================
 
 
+v1.5.7 - 19 Mar 2026
+---------------------
+FIXED
+- Duplicate detection now catches more cases:
+  - Field-based comparison now includes already-flagged records so a file
+    with the same WHO+DATE+ENTITY+WHAT as an exact duplicate also gets caught
+    (previously, exact duplicates were excluded from field comparison, allowing
+    a third copy with different binary content to slip through unflagged).
+  - One-per-claim document type checks similarly improved.
+  - Rows whose fields literally contain "DUPLICATE" (from previous rename
+    sessions) are now automatically flagged as Likely Duplicate.
+
+
 v1.5.6 - 19 Mar 2026
 ---------------------
 FIXED
