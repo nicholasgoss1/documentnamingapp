@@ -3,6 +3,15 @@
 ================================================================================
 
 
+v1.5.6 - 19 Mar 2026
+---------------------
+FIXED
+- Rename validation no longer blocks on duplicate target filenames. When
+  multiple approved files produce the same proposed name, the app now
+  automatically appends (2), (3), etc. to resolve collisions instead of
+  showing a "Duplicate target name" error.
+
+
 v1.5.5 - 19 Mar 2026
 ---------------------
 CHANGED

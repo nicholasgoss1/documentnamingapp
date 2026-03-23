@@ -44,10 +44,15 @@ def validate_rename(record: DocumentRecord) -> Tuple[bool, str]:
 
 
 def validate_batch(records: List[DocumentRecord]) -> List[Tuple[int, str]]:
-    """Validate all records. Returns list of (index, error_message) for failures."""
+    """Validate all records, auto-resolving duplicate target names.
+
+    When two approved records would produce the same filename, a (2), (3)
+    etc. suffix is appended automatically so the rename can proceed.
+    Returns list of (index, error_message) for genuine failures only.
+    """
     errors = []
-    # Check for duplicate target names
-    target_names = {}
+    # Track target names to detect collisions
+    target_names: dict[str, int] = {}  # lower_name → count
     for i, rec in enumerate(records):
         if rec.rename_status != RenameStatus.APPROVED:
             continue
@@ -57,9 +62,14 @@ def validate_batch(records: List[DocumentRecord]) -> List[Tuple[int, str]]:
             continue
         lower_name = rec.proposed_filename.lower()
         if lower_name in target_names:
-            errors.append((i, f"Duplicate target name with row {target_names[lower_name]}"))
+            # Auto-resolve: append (2), (3), etc.
+            target_names[lower_name] += 1
+            base = rec.proposed_filename
+            if base.lower().endswith(".pdf"):
+                base = base[:-4]
+            rec.proposed_filename = f"{base} ({target_names[lower_name]}).pdf"
         else:
-            target_names[lower_name] = i
+            target_names[lower_name] = 1
 
     return errors
 
