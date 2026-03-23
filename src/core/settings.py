@@ -8,7 +8,7 @@ from pathlib import Path
 from copy import deepcopy
 
 APP_NAME = "ClaimFileRenamer"
-APP_VERSION = "1.5.9"
+APP_VERSION = "1.6.0"
 
 
 def get_app_data_dir() -> Path:
@@ -68,7 +68,9 @@ DEFAULT_SETTINGS = {
             "engineering services", "clear engineering",
             "australian building & construction", "australian building and construction",
             "tomkat roofing", "mcs group",
-            "certified building inspection"
+            "certified building inspection",
+            "live electrical", "aizer insurance builders", "aizer insurance",
+            "aizer group", "salt water roofing", "saltwater roofing"
         ],
         "complainant_entities": ["ClaimsCo", "ACB", "AusCoast", "RUCA", "Balmoral", "Patcol"],
         "ff_entities": [
@@ -76,6 +78,8 @@ DEFAULT_SETTINGS = {
             "Clear Engineering Services", "Australian Building & Construction",
             "Tomkat Roofing", "MCS Group",
             "Certified Building Inspection Services",
+            "Live Electrical", "Aizer Insurance Builders",
+            "Salt Water Roofing",
             "BlueScope", "QBE", "WeatherWatch", "BoM",
             # General insurers
             "AAI", "Suncorp", "IAG", "Insurance Australia Limited",
@@ -220,14 +224,32 @@ DEFAULT_SETTINGS = {
         "clearengineeringservices": "Clear Engineering Services",
         "Claims Made Easy": "ClaimsCo",
         "CLAIMS MADE EASY": "ClaimsCo",
-        "claimsco.com.au": "ClaimsCo"
+        "claimsco.com.au": "ClaimsCo",
+        "Live Electrical & Air Conditioning": "Live Electrical",
+        "Live Electrical and Air Conditioning": "Live Electrical",
+        "Live Electrical & air conditioning": "Live Electrical",
+        "LIVE ELECTRICAL": "Live Electrical",
+        "liveg.com.au": "Live Electrical",
+        "www.liveg.com.au": "Live Electrical",
+        "Live Services Group": "Live Electrical",
+        "Aizer Insurance Builders Pty Ltd": "Aizer Insurance Builders",
+        "Aizer Insurance Builders Pty": "Aizer Insurance Builders",
+        "Aizer Insurance": "Aizer Insurance Builders",
+        "Aizer Group": "Aizer Insurance Builders",
+        "Aizer": "Aizer Insurance Builders",
+        "Saltwater Roofing": "Salt Water Roofing",
+        "SALTWATER ROOFING": "Salt Water Roofing",
+        "Salt Water Roofing Pty Ltd": "Salt Water Roofing",
+        "Saltwater Roofing Pty Ltd": "Salt Water Roofing"
     },
     "preferred_entities": [
         "ClaimsCo", "Campbell Constructions", "Sedgwick",
         "Morse Building Consultants", "Clear Engineering Services",
         "Australian Building & Construction", "Tomkat Roofing",
         "MCS Group", "Certified Building Inspection Services",
-        "BlueScope", "RCC National", "QBE", "RACQ Insurance", "AFCA",
+        "BlueScope", "RCC National", "QBE", "RACQ Insurance",
+        "Live Electrical", "Aizer Insurance Builders", "Salt Water Roofing",
+        "AFCA",
         "ACB", "AusCoast", "RUCA", "Balmoral", "Patcol",
         "WeatherWatch", "BoM", "COI"
     ],
@@ -243,7 +265,8 @@ DEFAULT_SETTINGS = {
         "Pre Purchase Inspection Report",
         "Engineering Report", "TB32 Technical Bulletin", "Desktop Report",
         "Final Report",
-        "Hail Report", "Quote", "Weather Pack", "Agent Authority Form",
+        "Hail Report", "Solar PV Specialist Report",
+        "Quote", "Weather Pack", "Agent Authority Form",
         "Delegation of Authority", "Information Sheet",
         "Timeline",
         "Request for Information", "Written Preliminary Assessment"
@@ -314,6 +337,10 @@ DEFAULT_SETTINGS = {
         "Desktop Report": ["desktop report", "desktop assessment", "desktop review"],
         "Final Report": ["final report"],
         "Hail Report": ["hail report", "hail damage", "hail assessment"],
+        "Solar PV Specialist Report": [
+            "solar pv specialist report", "solar pv specialist",
+            "solar pv report", "solar specialist report"
+        ],
         "Quote": ["quote", "quotation", "estimate"],
         "Weather Pack": ["weather pack", "weather report", "weather data"],
         "Agent Authority Form": ["authority and access form", "aaf"],
@@ -344,6 +371,7 @@ DEFAULT_SETTINGS = {
         "Desktop Report": True,
         "Final Report": True,
         "Hail Report": True,
+        "Solar PV Specialist Report": True,
         "Quote": True,
         "IDR FDL": True,
         "Notice of Response": False,

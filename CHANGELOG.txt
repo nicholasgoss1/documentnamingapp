@@ -3,6 +3,17 @@
 ================================================================================
 
 
+v1.6.0 - 23 Mar 2026
+---------------------
+ADDED
+- New entity: Live Electrical (aliases: Live Electrical & Air Conditioning,
+  Live Services Group, liveg.com.au)
+- New entity: Aizer Insurance Builders (aliases: Aizer Insurance, Aizer Group)
+- New entity: Salt Water Roofing (alias: Saltwater Roofing)
+- New document type: Solar PV Specialist Report
+- Conflict rule: Solar PV Specialist Report wins over Quote when both match
+
+
 v1.5.9 - 23 Mar 2026
 ---------------------
 CHANGED
