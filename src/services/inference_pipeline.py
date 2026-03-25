@@ -253,6 +253,12 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
     if "tb32 technical bulletin" in what_lower:
         record.entity = "BlueScope"
 
+    # Patcol documents are always Engineers Roof Reports
+    entity_lower_check = (record.entity or "").lower()
+    if entity_lower_check == "patcol":
+        record.what = "Engineers Roof Report"
+        what_lower = record.what.lower()
+
     # Written Preliminary Assessments are always AFCA-issued documents
     if "written preliminary assessment" in what_lower or "preliminary assessment" in what_lower:
         record.who = "AFCA"

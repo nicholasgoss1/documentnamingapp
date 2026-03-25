@@ -104,9 +104,9 @@ def parse_date(text: str, pattern_type: str, match) -> Tuple[str, bool]:
 # Labels that introduce a non-letter date (e.g. "Date of Loss: 24 Dec 2023").
 # Dates following these labels describe the event, NOT the document date.
 _EVENT_DATE_LABELS = re.compile(
-    r'(?:date\s+of\s+(?:loss|incident|event|damage|claim)|'
+    r'(?:date\s+of\s+(?:loss|incident|event|damage|claim|notification|inspection)|'
     r'date\s+(?:notified|reported|lodged)|'
-    r'incident\s+date|loss\s+date|event\s+date|'
+    r'incident\s+date|loss\s+date|event\s+date|inspection\s+date|'
     r'originally\s+constructed|constructed\s+in)\s*[:.]?\s*$',
     re.IGNORECASE,
 )
@@ -130,6 +130,9 @@ def extract_all_dates(text: str, exclude_event_dates: bool = False) -> list:
                 if _EVENT_DATE_LABELS.search(prefix):
                     continue
             results.append((date_str, is_partial, match.start()))
+    # Sort by position in text so earliest date comes first regardless of
+    # which regex pattern matched it.
+    results.sort(key=lambda x: x[2])
     return results
 
 
@@ -317,6 +320,10 @@ def infer_date(doc_type: str, page1_text: str, full_text: str,
         date, _ = find_page1_top_date(page1_text)
         if date:
             return date, 15
+        # Fallback: "Printed On" date (common in scope of works / quotes)
+        printed_date = find_printed_on_date(full_text)
+        if printed_date:
+            return printed_date, 14
         return "NO DATE", 5
 
     # 7. Photo schedules

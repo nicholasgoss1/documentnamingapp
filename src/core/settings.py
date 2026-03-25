@@ -70,7 +70,9 @@ DEFAULT_SETTINGS = {
             "tomkat roofing", "mcs group",
             "certified building inspection",
             "live electrical", "aizer insurance builders", "aizer insurance",
-            "aizer group", "salt water roofing", "saltwater roofing"
+            "aizer group", "salt water roofing", "saltwater roofing",
+            "imparta engineers", "imparta",
+            "aj grant"
         ],
         "complainant_entities": ["ClaimsCo", "ACB", "AusCoast", "RUCA", "Balmoral", "Patcol"],
         "ff_entities": [
@@ -79,7 +81,8 @@ DEFAULT_SETTINGS = {
             "Tomkat Roofing", "MCS Group",
             "Certified Building Inspection Services",
             "Live Electrical", "Aizer Insurance Builders",
-            "Salt Water Roofing",
+            "Salt Water Roofing", "Imparta Engineers",
+            "AJ Grant",
             "BlueScope", "QBE", "WeatherWatch", "BoM",
             # General insurers
             "AAI", "Suncorp", "IAG", "Insurance Australia Limited",
@@ -241,6 +244,9 @@ DEFAULT_SETTINGS = {
         "SALTWATER ROOFING": "Salt Water Roofing",
         "Salt Water Roofing Pty Ltd": "Salt Water Roofing",
         "Saltwater Roofing Pty Ltd": "Salt Water Roofing",
+        "Imparta": "Imparta Engineers",
+        "Imparta Engineers Pty Ltd": "Imparta Engineers",
+        "impartaengineers": "Imparta Engineers",
         "Melrose Building": "Melrose Building Projects",
         "Melrose Building Projects Pty Ltd": "Melrose Building Projects",
         "Melrose Building Projects Pty": "Melrose Building Projects"
@@ -252,6 +258,7 @@ DEFAULT_SETTINGS = {
         "MCS Group", "Certified Building Inspection Services",
         "BlueScope", "RCC National", "QBE", "RACQ Insurance",
         "Live Electrical", "Aizer Insurance Builders", "Salt Water Roofing",
+        "Imparta Engineers", "AJ Grant",
         "AFCA",
         "ACB", "AusCoast", "RUCA", "Balmoral", "Patcol",
         "Melrose Building Projects",
@@ -274,7 +281,8 @@ DEFAULT_SETTINGS = {
         "Delegation of Authority", "Information Sheet",
         "Timeline",
         "Request for Information", "Written Preliminary Assessment",
-        "Variation Report", "Response to AFCA"
+        "Variation Report", "Response to AFCA",
+        "Engineers Roof Report"
     ],
     "doc_type_keywords": {
         "Site Report": ["site report", "site inspection"],
@@ -366,6 +374,9 @@ DEFAULT_SETTINGS = {
             "response to afca", "further response",
             "requesting a response to the information provided",
             "response to the information provided"
+        ],
+        "Engineers Roof Report": [
+            "engineers roof report"
         ]
     },
     "entity_include_rules": {
@@ -405,7 +416,8 @@ DEFAULT_SETTINGS = {
         "Delegation of Authority": True,
         "Information Sheet": True,
         "Variation Report": True,
-        "Response to AFCA": True
+        "Response to AFCA": True,
+        "Engineers Roof Report": True
     },
     "presets": {}
 }
