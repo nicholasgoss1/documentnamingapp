@@ -256,6 +256,14 @@ def infer_date(doc_type: str, page1_text: str, full_text: str,
     """
     doc_lower = doc_type.lower() if doc_type else ""
 
+    # 0. Site reports: prefer "Printed On" date (most reliable for these)
+    site_report_types = ["site report"]
+    if any(t in doc_lower for t in site_report_types):
+        printed_date = find_printed_on_date(full_text)
+        if printed_date:
+            return printed_date, 18
+        # Fall through to letter logic if no "Printed On" date
+
     # 1. Formal letters and reports
     if any(t in doc_lower for t in LETTER_TYPES):
         # Look for the letter date, excluding event dates (Date of Loss etc.)
@@ -321,14 +329,14 @@ def infer_date(doc_type: str, page1_text: str, full_text: str,
 
     # 6. Quotes
     if any(t in doc_lower for t in QUOTE_TYPES):
+        # Prefer "Printed On" date (common in scope of works / quotes)
+        printed_date = find_printed_on_date(full_text)
+        if printed_date:
+            return printed_date, 18
         # Look for "quote date" or "date" near top
         date, _ = find_page1_top_date(page1_text)
         if date:
             return date, 15
-        # Fallback: "Printed On" date (common in scope of works / quotes)
-        printed_date = find_printed_on_date(full_text)
-        if printed_date:
-            return printed_date, 14
         return "NO DATE", 5
 
     # 7. Photo schedules

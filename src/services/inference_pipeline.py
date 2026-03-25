@@ -194,9 +194,10 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
         if any(afca_indicators) and what_lower not in ["claimsco letter to idr"]:
             record.who = "Complainant"
             record.entity = "ClaimsCo"
-            # Keep "Notice of Response" as-is; override other misclassifications
+            # Notice of Response from ClaimsCo to AFCA → Response to AFCA
             if "notice of response" in what_lower:
-                record.what = "Notice of Response"
+                record.what = "Response to AFCA"
+                what_lower = record.what.lower()
             else:
                 record.what = "ClaimsCo Letter to IDR"
 
@@ -212,10 +213,6 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
             record.what = "Response to AFCA"
             record.who = "FF"
             what_lower = record.what.lower()
-
-    # Response to AFCA is always FF-side
-    if "response to afca" in what_lower:
-        record.who = "FF"
 
     # Engineering reports are always FF-side (prepared by engineering firms
     # engaged by the insurer/loss adjuster, not the complainant)
