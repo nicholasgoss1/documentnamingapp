@@ -282,7 +282,7 @@ DEFAULT_SETTINGS = {
         "Timeline",
         "Request for Information", "Written Preliminary Assessment",
         "Variation Report", "Response to AFCA",
-        "Engineers Roof Report"
+        "Engineers Roof Report", "Submission to AFCA"
     ],
     "doc_type_keywords": {
         "Site Report": ["site report", "site inspection"],
@@ -417,7 +417,8 @@ DEFAULT_SETTINGS = {
         "Information Sheet": True,
         "Variation Report": True,
         "Response to AFCA": True,
-        "Engineers Roof Report": True
+        "Engineers Roof Report": True,
+        "Submission to AFCA": True
     },
     "presets": {}
 }

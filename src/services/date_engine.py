@@ -44,7 +44,7 @@ LETTER_TYPES = [
     "idr fdl", "claims team fdl",
     "request for information", "written preliminary assessment",
     "initial claims advice", "weather pack",
-    "response to afca", "variation report"
+    "response to afca", "variation report", "submission to afca"
 ]
 SIGNED_TYPES = ["letter of engagement", "agent authority form", "aaf to be signed", "delegation of authority"]
 POLICY_TYPES = ["policy schedule", "certificate of insurance"]

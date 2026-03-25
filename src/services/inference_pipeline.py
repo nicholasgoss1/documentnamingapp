@@ -198,6 +198,14 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
             if "notice of response" in what_lower:
                 record.what = "Response to AFCA"
                 what_lower = record.what.lower()
+            # AFCA Submission: complaint lodgement with AFCA
+            elif ("afca submission" in what_lower
+                  or "submit a complaint" in page1_normalized
+                  or "lodge a complaint" in page1_normalized
+                  or "lodgement of a formal complaint" in page1_normalized
+                  or "escalate this matter" in page1_normalized):
+                record.what = "Submission to AFCA"
+                what_lower = record.what.lower()
             else:
                 record.what = "ClaimsCo Letter to IDR"
 
