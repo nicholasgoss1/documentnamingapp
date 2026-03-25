@@ -107,6 +107,7 @@ _EVENT_DATE_LABELS = re.compile(
     r'(?:date\s+of\s+(?:loss|incident|event|damage|claim|notification|inspection)|'
     r'date\s+(?:notified|reported|lodged)|'
     r'incident\s+date|loss\s+date|event\s+date|inspection\s+date|'
+    r'effective\s+date|effective\s+from|'
     r'originally\s+constructed|constructed\s+in)\s*[:.]?\s*$',
     re.IGNORECASE,
 )
@@ -291,11 +292,15 @@ def infer_date(doc_type: str, page1_text: str, full_text: str,
         return "NO DATE", 5
 
     # 3. Policy schedule / COI
+    # Prefer the letter date at the top of page 1 (e.g. endorsement letters).
+    # Fall back to policy inception date if no letter date is found.
     if any(t in doc_lower for t in POLICY_TYPES):
+        date, is_partial = find_page1_top_date(page1_text, exclude_event_dates=True)
+        if date and not is_partial:
+            return date, 18
         inception = find_policy_inception_date(full_text)
         if inception:
-            return inception, 18
-        date, _ = find_page1_top_date(page1_text)
+            return inception, 15
         if date:
             return date, 10
         return "NO DATE", 5
