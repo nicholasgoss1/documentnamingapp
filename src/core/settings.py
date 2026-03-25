@@ -240,7 +240,10 @@ DEFAULT_SETTINGS = {
         "Saltwater Roofing": "Salt Water Roofing",
         "SALTWATER ROOFING": "Salt Water Roofing",
         "Salt Water Roofing Pty Ltd": "Salt Water Roofing",
-        "Saltwater Roofing Pty Ltd": "Salt Water Roofing"
+        "Saltwater Roofing Pty Ltd": "Salt Water Roofing",
+        "Melrose Building": "Melrose Building Projects",
+        "Melrose Building Projects Pty Ltd": "Melrose Building Projects",
+        "Melrose Building Projects Pty": "Melrose Building Projects"
     },
     "preferred_entities": [
         "ClaimsCo", "Campbell Constructions", "Sedgwick",
@@ -251,6 +254,7 @@ DEFAULT_SETTINGS = {
         "Live Electrical", "Aizer Insurance Builders", "Salt Water Roofing",
         "AFCA",
         "ACB", "AusCoast", "RUCA", "Balmoral", "Patcol",
+        "Melrose Building Projects",
         "WeatherWatch", "BoM", "COI"
     ],
     "preferred_doc_labels": [
@@ -269,7 +273,8 @@ DEFAULT_SETTINGS = {
         "Quote", "Weather Pack", "Agent Authority Form",
         "Delegation of Authority", "Information Sheet",
         "Timeline",
-        "Request for Information", "Written Preliminary Assessment"
+        "Request for Information", "Written Preliminary Assessment",
+        "Variation Report", "Response to AFCA"
     ],
     "doc_type_keywords": {
         "Site Report": ["site report", "site inspection"],
@@ -352,6 +357,15 @@ DEFAULT_SETTINGS = {
         ],
         "Written Preliminary Assessment": [
             "written preliminary assessment", "preliminary assessment"
+        ],
+        "Variation Report": [
+            "variation report", "variation report & quotation",
+            "variation report and quotation", "variation scope of works"
+        ],
+        "Response to AFCA": [
+            "response to afca", "further response",
+            "requesting a response to the information provided",
+            "response to the information provided"
         ]
     },
     "entity_include_rules": {
@@ -389,7 +403,9 @@ DEFAULT_SETTINGS = {
         "Initial Claims Advice": False,
         "Timeline": False,
         "Delegation of Authority": True,
-        "Information Sheet": True
+        "Information Sheet": True,
+        "Variation Report": True,
+        "Response to AFCA": True
     },
     "presets": {}
 }

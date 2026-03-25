@@ -284,7 +284,7 @@ def infer_what(page1_text: str, full_text: str, filename: str,
     # checked in order — first match wins.
     conflict_overrides = {
         "Information Sheet": ["IDR FDL"],
-        "Quote": ["Engineering Report", "Solar PV Specialist Report"],
+        "Quote": ["Variation Report", "Engineering Report", "Solar PV Specialist Report"],
         "Delegation of Authority": ["Letter of Engagement", "AFCA Submission"],
         "PDS": ["Claims Team FDL", "Request for Information"],
         "Hail Report": ["TB32 Technical Bulletin"],

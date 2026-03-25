@@ -167,9 +167,16 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
         "resolution of claim settlement",
         "the financial firm's",
     ]
+    # If the letterhead (top-right) clearly shows an FF entity, the document
+    # is FROM the insurer — body text may reference ClaimsCo without being
+    # authored by them.
+    letterhead_is_ff = any(ent in top_right for ent in ff_ents)
     is_from_claimsco = (
-        "claimsco" in top_right
-        or any(phrase in page1_normalized for phrase in claimsco_authorship_phrases)
+        not letterhead_is_ff
+        and (
+            "claimsco" in top_right
+            or any(phrase in page1_normalized for phrase in claimsco_authorship_phrases)
+        )
     )
 
     # If authored by ClaimsCo and addressed to/about AFCA, it's a ClaimsCo Letter to IDR
@@ -196,6 +203,19 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
     # If authored by ClaimsCo, set entity to ClaimsCo (logo may be image-only)
     if is_from_claimsco and record.entity != "ClaimsCo":
         record.entity = "ClaimsCo"
+
+    # Notice of Response from an FF entity (e.g. Allianz responding to AFCA)
+    # is actually a "Response to AFCA", not AFCA's notice.
+    if "notice of response" in what_lower:
+        entity_lower = (record.entity or "").lower()
+        if letterhead_is_ff or entity_lower in ff_ents:
+            record.what = "Response to AFCA"
+            record.who = "FF"
+            what_lower = record.what.lower()
+
+    # Response to AFCA is always FF-side
+    if "response to afca" in what_lower:
+        record.who = "FF"
 
     # Engineering reports are always FF-side (prepared by engineering firms
     # engaged by the insurer/loss adjuster, not the complainant)
@@ -232,6 +252,11 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
         record.entity = "AAF"
     if "tb32 technical bulletin" in what_lower:
         record.entity = "BlueScope"
+
+    # Written Preliminary Assessments are always AFCA-issued documents
+    if "written preliminary assessment" in what_lower or "preliminary assessment" in what_lower:
+        record.who = "AFCA"
+        record.entity = "AFCA"
 
     # AFCA-authored documents should always show ENTITY = AFCA
     if record.who == "AFCA" and not record.entity:

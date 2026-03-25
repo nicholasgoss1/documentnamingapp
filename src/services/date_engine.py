@@ -43,7 +43,8 @@ LETTER_TYPES = [
     "supplementary technical assessment report", "notice of response",
     "idr fdl", "claims team fdl",
     "request for information", "written preliminary assessment",
-    "initial claims advice", "weather pack"
+    "initial claims advice", "weather pack",
+    "response to afca", "variation report"
 ]
 SIGNED_TYPES = ["letter of engagement", "agent authority form", "aaf to be signed", "delegation of authority"]
 POLICY_TYPES = ["policy schedule", "certificate of insurance"]
