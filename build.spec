@@ -1,19 +1,46 @@
 # -*- mode: python ; coding: utf-8 -*-
-# PyInstaller spec file for ClaimsCo Document Tools
+# PyInstaller spec file for ClaimsCo Document Tools v2.0.0
 
 import sys
 import os
+import importlib
 
 block_cipher = None
 
+# ── Locate spaCy model ──────────────────────────────────────────────
+_spacy_model_data = []
+try:
+    import en_core_web_sm
+    model_dir = os.path.dirname(en_core_web_sm.__file__)
+    _spacy_model_data.append((model_dir, 'en_core_web_sm'))
+except ImportError:
+    print("WARNING: en_core_web_sm not installed — Privacy Redaction NER will be disabled")
+
+# ── Optional: bundle GitHub sync token and Groq key ──────────────────
+_extra_datas = []
+_token_path = 'C:/Projects/GitHub sync token.txt'
+if os.path.exists(_token_path):
+    _extra_datas.append((_token_path, '.'))
+    print(f"Bundling GitHub sync token: {_token_path}")
+
+_groq_key_path = 'C:/Projects/Groq API key.txt'
+if os.path.exists(_groq_key_path):
+    _extra_datas.append((_groq_key_path, '.'))
+    print(f"Bundling Groq API key: {_groq_key_path}")
+
+# Also bundle the .groq_key if present in src/services/
+_groq_dotkey = 'src/services/.groq_key'
+if os.path.exists(_groq_dotkey):
+    _extra_datas.append((_groq_dotkey, 'src/services'))
+
 a = Analysis(
-    ['ClaimsCo_Tools.py'],   # entry point — the combined 3-tab app
+    ['main.py'],   # entry point — the three-tab app
     pathex=[],
     binaries=[],
     datas=[
         ('assets', 'assets'),
         ('src', 'src'),
-    ],
+    ] + _spacy_model_data + _extra_datas,
     hiddenimports=[
         # Qt
         'PySide6.QtCore',
@@ -39,7 +66,30 @@ a = Analysis(
         'docx',
         'docx.document',
         'docx.oxml',
-        # src package
+        # Groq AI
+        'groq',
+        'httpx',
+        'httpcore',
+        'anyio',
+        'sniffio',
+        'h11',
+        'pydantic',
+        'pydantic_core',
+        'annotated_types',
+        # spaCy
+        'spacy',
+        'en_core_web_sm',
+        'thinc',
+        'blis',
+        'cymem',
+        'murmurhash',
+        'preshed',
+        'srsly',
+        'wasabi',
+        'catalogue',
+        'confection',
+        'tqdm',
+        # src package — all modules
         'src',
         'src.core',
         'src.core.settings',
@@ -53,6 +103,13 @@ a = Analysis(
         'src.services.normalizer',
         'src.services.pdf_extractor',
         'src.services.rename_service',
+        'src.services.ai_classifier',
+        'src.services.ai_redactor',
+        'src.services.smart_extractor',
+        'src.services.seed_examples',
+        'src.services.corrections_store',
+        'src.services.github_sync',
+        'src.services.auto_harvest',
         'src.ui',
         'src.ui.filter_proxy',
         'src.ui.history_dialog',
@@ -62,6 +119,8 @@ a = Analysis(
         'src.ui.table_model',
         'src.ui.theme',
         'src.ui.worker',
+        'src.ui.privacy_tab',
+        'src.ui.extraction_tab',
     ],
     hookspath=[],
     hooksconfig={},
