@@ -1,24 +1,27 @@
 """
-Privacy Redaction tab - scans PDFs for PII and replaces with tokens.
+Privacy Redaction tab — PDF viewer with auto + manual redaction tools.
 """
 import os
 import re
+import logging
 from dataclasses import dataclass, field
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import fitz  # PyMuPDF
 
-from PySide6.QtCore import Qt, Signal, QThread
+from PySide6.QtCore import Qt, Signal, QThread, QRect, QPoint, QRectF, QSize, QTimer
+from PySide6.QtGui import (
+    QPixmap, QImage, QPainter, QColor, QPen, QBrush, QCursor, QDragEnterEvent, QDropEvent,
+)
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QLineEdit, QProgressBar, QTableWidget, QTableWidgetItem,
-    QFileDialog, QDialog, QTextEdit, QHeaderView, QGroupBox,
-    QMessageBox,
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QProgressBar,
+    QListWidget, QListWidgetItem, QScrollArea, QSplitter, QFileDialog,
+    QMessageBox, QGroupBox, QApplication, QRubberBand, QFrame, QToolButton,
 )
 
-# ---------------------------------------------------------------------------
-# Optional spaCy support
-# ---------------------------------------------------------------------------
+logger = logging.getLogger(__name__)
+
+# Optional spaCy
 _HAS_SPACY = False
 _NLP = None
 try:
@@ -28,449 +31,675 @@ try:
 except Exception:
     pass
 
-# ---------------------------------------------------------------------------
-# Regex patterns
-# ---------------------------------------------------------------------------
-_RE_PHONE = re.compile(
-    r'\b(?:04\d{2}[\s-]?\d{3}[\s-]?\d{3}|(?:\(0\d\)|0\d)[\s-]?\d{4}[\s-]?\d{4})\b'
-)
+# Regex patterns for PII
+_RE_PHONE = re.compile(r'(\+?61[\s-]?)?(0\d[\s-]?)[\d\s-]{8,10}')
 _RE_POLICY = re.compile(r'\b[A-Z]{2,4}[-]?\d{6,12}\b')
-_RE_ADDRESS = re.compile(
-    r'\b\d{1,5}\s+[A-Z][a-z]+\s+'
-    r'(?:Street|St|Road|Rd|Avenue|Ave|Drive|Dr|Court|Ct|Place|Pl|Lane|Ln|'
-    r'Crescent|Cres|Way|Boulevard|Blvd|Terrace|Tce|Circuit|Cct|Close|Cl|'
-    r'Parade|Pde|Highway|Hwy)\b'
-)
+_RE_ACCOUNT = re.compile(r'\d{12,}')
+_RE_STREET = re.compile(r'\b\d{1,4}[A-Za-z]?\b(?=\s+[A-Z][a-z])')
+
+# Default DPI for rendering
+_DEFAULT_DPI = 150
+_MIN_DPI = 72
+_MAX_DPI = 300
 
 
-# ---------------------------------------------------------------------------
-# Data classes
-# ---------------------------------------------------------------------------
 @dataclass
-class FileResult:
-    filename: str
-    lines_processed: int = 0
-    pii_tokens_found: int = 0
-    status: str = "Pending"
-    redacted_lines: List[str] = field(default_factory=list)
+class RedactionBox:
+    page_num: int
+    pdf_rect: tuple  # (x0, y0, x1, y1) in PDF coordinates
+    type: str  # "AUTO" or "MANUAL"
+    text: str = ""  # detected text or ""
 
 
-# ---------------------------------------------------------------------------
-# Worker thread
-# ---------------------------------------------------------------------------
-class RedactionWorker(QThread):
-    """Background worker that scans PDFs and redacts PII."""
-
-    progress = Signal(int, int)          # current file index, total files
-    file_done = Signal(int, object)      # file index, FileResult
-    finished = Signal(list, dict)        # List[FileResult], token_map
-    error = Signal(str)
-
-    def __init__(
-        self,
-        folder: str,
-        firm_name: str,
-        matter_ref: str,
-        parent=None,
-    ):
-        super().__init__(parent)
-        self._folder = folder
-        self._firm_name = firm_name
-        self._matter_ref = matter_ref
-
-    # ---- internal helpers ------------------------------------------------
-
-    @staticmethod
-    def _extract_text(path: str) -> List[str]:
-        doc = fitz.open(path)
-        lines: List[str] = []
-        for page in doc:
-            text = page.get_text("text")
-            lines.extend(text.splitlines())
-        doc.close()
-        return lines
-
-    def _find_pii_spans(self, line: str) -> List[Tuple[int, int, str]]:
-        """Return sorted, non-overlapping (start, end, matched_text) spans."""
-        spans: List[Tuple[int, int, str]] = []
-
-        # spaCy NER - PERSON entities with 2+ words
-        if _HAS_SPACY and _NLP is not None:
-            doc = _NLP(line)
-            for ent in doc.ents:
-                if ent.label_ == "PERSON" and len(ent.text.split()) >= 2:
-                    spans.append((ent.start_char, ent.end_char, ent.text))
-
-        # Regex patterns
-        for m in _RE_ADDRESS.finditer(line):
-            spans.append((m.start(), m.end(), m.group()))
-        for m in _RE_PHONE.finditer(line):
-            spans.append((m.start(), m.end(), m.group()))
-        for m in _RE_POLICY.finditer(line):
-            spans.append((m.start(), m.end(), m.group()))
-
-        # Sort by start position, then remove overlaps (keep longer match)
-        spans.sort(key=lambda s: (s[0], -(s[1] - s[0])))
-        merged: List[Tuple[int, int, str]] = []
-        for span in spans:
-            if merged and span[0] < merged[-1][1]:
-                continue  # overlaps with previous - skip
-            merged.append(span)
-        return merged
-
-    def _redact_line(
-        self,
-        line: str,
-        token_map: Dict[str, str],
-        reverse_map: Dict[str, str],
-        counter: List[int],
-    ) -> Tuple[str, int]:
-        """Replace PII in *line* with tokens.  Returns (redacted_line, n_new_tokens)."""
-        spans = self._find_pii_spans(line)
-        if not spans:
-            return line, 0
-
-        new_tokens = 0
-        parts: List[str] = []
-        prev_end = 0
-        for start, end, value in spans:
-            parts.append(line[prev_end:start])
-            normalised = value.strip()
-            if normalised in reverse_map:
-                token = reverse_map[normalised]
-            else:
-                counter[0] += 1
-                token = f"[CLIENT_ID_{counter[0]:03d}]"
-                token_map[token] = normalised
-                reverse_map[normalised] = token
-                new_tokens += 1
-            parts.append(token)
-            prev_end = end
-        parts.append(line[prev_end:])
-        return "".join(parts), new_tokens
-
-    # ---- main run --------------------------------------------------------
-
-    def run(self):
-        try:
-            pdf_files = sorted(
-                f for f in os.listdir(self._folder)
-                if f.lower().endswith(".pdf")
-            )
-            if not pdf_files:
-                self.error.emit("No PDF files found in the selected folder.")
-                return
-
-            total = len(pdf_files)
-            token_map: Dict[str, str] = {}      # token -> real value
-            reverse_map: Dict[str, str] = {}    # real value -> token
-            counter = [0]                        # mutable int wrapper
-            results: List[FileResult] = []
-
-            for idx, filename in enumerate(pdf_files):
-                self.progress.emit(idx, total)
-                path = os.path.join(self._folder, filename)
-                result = FileResult(filename=filename)
-                try:
-                    lines = self._extract_text(path)
-                    result.lines_processed = len(lines)
-                    pii_count = 0
-                    for line in lines:
-                        redacted, n = self._redact_line(
-                            line, token_map, reverse_map, counter
-                        )
-                        pii_count += n
-                        result.redacted_lines.append(redacted)
-                    result.pii_tokens_found = pii_count
-                    result.status = "Done"
-                except Exception as exc:
-                    result.status = f"Error: {exc}"
-                results.append(result)
-                self.file_done.emit(idx, result)
-
-            self.progress.emit(total, total)
-            self.finished.emit(results, token_map)
-        except Exception as exc:
-            self.error.emit(str(exc))
-
-
-# ---------------------------------------------------------------------------
-# Token Map dialog
-# ---------------------------------------------------------------------------
-class TokenMapDialog(QDialog):
-    """Read-only dialog showing the full token-to-real-value mapping."""
-
-    def __init__(self, token_map: Dict[str, str], parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Token Map")
-        self.setMinimumSize(520, 400)
-
-        layout = QVBoxLayout(self)
-
-        title = QLabel("PII Token Map")
-        title.setObjectName("titleLabel")
-        layout.addWidget(title)
-
-        subtitle = QLabel(
-            "Each token below maps to the original PII value that was redacted."
-        )
-        subtitle.setObjectName("subtitleLabel")
-        layout.addWidget(subtitle)
-
-        text_edit = QTextEdit()
-        text_edit.setReadOnly(True)
-        lines: List[str] = []
-        for token, value in token_map.items():
-            lines.append(f"{token}  \u2192  {value}")
-        text_edit.setPlainText("\n".join(lines) if lines else "(no tokens)")
-        layout.addWidget(text_edit)
-
-        close_btn = QPushButton("Close")
-        close_btn.clicked.connect(self.accept)
-        layout.addWidget(close_btn, alignment=Qt.AlignRight)
-
-
-# ---------------------------------------------------------------------------
-# Privacy Redaction tab widget
-# ---------------------------------------------------------------------------
-class PrivacyTab(QWidget):
-    """Tab 2 - Privacy Redaction for insurance claim PDFs."""
+class DropZone(QFrame):
+    """Dashed-border drop zone that accepts PDFs and folders."""
+    files_dropped = Signal(list)
+    clicked = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._worker: RedactionWorker | None = None
-        self._results: List[FileResult] = []
-        self._token_map: Dict[str, str] = {}
-        self._build_ui()
+        self.setAcceptDrops(True)
+        self.setMinimumHeight(120)
+        self.setStyleSheet(
+            "QFrame { border: 2px dashed #45475a; border-radius: 12px; }"
+        )
+        self.setCursor(Qt.PointingHandCursor)
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignCenter)
+        self._label = QLabel("Drop PDFs here\nor click to browse")
+        self._label.setAlignment(Qt.AlignCenter)
+        self._label.setObjectName("subtitleLabel")
+        layout.addWidget(self._label)
+        self._count_label = QLabel("")
+        self._count_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self._count_label)
 
-    # ---- UI construction -------------------------------------------------
+    def set_count(self, n: int):
+        self._count_label.setText(f"{n} files loaded" if n else "")
+
+    def mousePressEvent(self, event):
+        self.clicked.emit()
+
+    def dragEnterEvent(self, event: QDragEnterEvent):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+
+    def dropEvent(self, event: QDropEvent):
+        files = []
+        for url in event.mimeData().urls():
+            path = url.toLocalFile()
+            if path.lower().endswith(".pdf"):
+                files.append(path)
+            elif os.path.isdir(path):
+                for root, _, fns in os.walk(path):
+                    for fn in fns:
+                        if fn.lower().endswith(".pdf"):
+                            files.append(os.path.join(root, fn))
+        if files:
+            self.files_dropped.emit(files)
+
+
+class AutoRedactWorker(QThread):
+    """Background worker for auto-detecting PII in PDFs."""
+    progress = Signal(int, int)  # current_page, total_pages
+    page_done = Signal(int, list)  # page_num, list of RedactionBox
+    finished = Signal()
+
+    def __init__(self, file_path: str, parent=None):
+        super().__init__(parent)
+        self._file_path = file_path
+
+    def run(self):
+        try:
+            doc = fitz.open(self._file_path)
+            total = len(doc)
+            for page_num in range(total):
+                self.progress.emit(page_num + 1, total)
+                page = doc[page_num]
+                text = page.get_text()
+                boxes = []
+
+                # spaCy NER
+                if _HAS_SPACY and _NLP:
+                    try:
+                        nlp_doc = _NLP(text)
+                        for ent in nlp_doc.ents:
+                            if ent.label_ == "PERSON" and len(ent.text.split()) >= 2:
+                                rects = page.search_for(ent.text)
+                                for r in rects:
+                                    boxes.append(RedactionBox(
+                                        page_num=page_num,
+                                        pdf_rect=(r.x0, r.y0, r.x1, r.y1),
+                                        type="AUTO",
+                                        text=ent.text,
+                                    ))
+                    except Exception:
+                        pass
+
+                # Regex patterns
+                for pattern in [_RE_PHONE, _RE_POLICY, _RE_ACCOUNT]:
+                    for m in pattern.finditer(text):
+                        matched = m.group().strip()
+                        if len(matched) < 4:
+                            continue
+                        rects = page.search_for(matched)
+                        for r in rects:
+                            boxes.append(RedactionBox(
+                                page_num=page_num,
+                                pdf_rect=(r.x0, r.y0, r.x1, r.y1),
+                                type="AUTO",
+                                text=matched,
+                            ))
+
+                self.page_done.emit(page_num, boxes)
+            doc.close()
+        except Exception as e:
+            logger.debug("Auto-redact error: %s", e)
+        self.finished.emit()
+
+
+class PageWidget(QLabel):
+    """Renders one page of a PDF with redaction overlay boxes."""
+    box_drawn = Signal(int, tuple)  # page_num, (x0, y0, x1, y1) in PDF coords
+    box_clicked = Signal(int, QPoint)  # page_num, click point in PDF coords
+
+    def __init__(self, page_num: int, parent=None):
+        super().__init__(parent)
+        self.page_num = page_num
+        self._pixmap: Optional[QPixmap] = None
+        self._boxes: List[RedactionBox] = []
+        self._dpi_scale = _DEFAULT_DPI / 72.0
+        self._drawing = False
+        self._erasing = False
+        self._rubber_band: Optional[QRubberBand] = None
+        self._drag_start = QPoint()
+
+    def set_pixmap(self, pixmap: QPixmap, dpi_scale: float):
+        self._pixmap = pixmap
+        self._dpi_scale = dpi_scale
+        self._redraw()
+
+    def set_boxes(self, boxes: List[RedactionBox]):
+        self._boxes = boxes
+        self._redraw()
+
+    def set_drawing_mode(self, on: bool):
+        self._drawing = on
+        self._erasing = False
+        self.setCursor(Qt.CrossCursor if on else Qt.ArrowCursor)
+
+    def set_erasing_mode(self, on: bool):
+        self._erasing = on
+        self._drawing = False
+        self.setCursor(Qt.PointingHandCursor if on else Qt.ArrowCursor)
+
+    def _redraw(self):
+        if not self._pixmap:
+            return
+        canvas = QPixmap(self._pixmap)
+        painter = QPainter(canvas)
+        for box in self._boxes:
+            if box.page_num != self.page_num:
+                continue
+            x0, y0, x1, y1 = box.pdf_rect
+            s = self._dpi_scale
+            rect = QRectF(x0 * s, y0 * s, (x1 - x0) * s, (y1 - y0) * s)
+            if box.type == "AUTO":
+                painter.fillRect(rect, QColor(255, 0, 0, 120))
+            else:
+                painter.fillRect(rect, QColor(0, 0, 0, 255))
+        painter.end()
+        super().setPixmap(canvas)
+
+    def mousePressEvent(self, event):
+        if self._drawing and event.button() == Qt.LeftButton:
+            self._drag_start = event.pos()
+            self._rubber_band = QRubberBand(QRubberBand.Rectangle, self)
+            self._rubber_band.setGeometry(QRect(self._drag_start, QSize()))
+            self._rubber_band.show()
+        elif self._erasing and event.button() == Qt.LeftButton:
+            # Convert click to PDF coords
+            s = self._dpi_scale
+            px, py = event.pos().x() / s, event.pos().y() / s
+            self.box_clicked.emit(self.page_num, QPoint(int(px * 100), int(py * 100)))
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._rubber_band:
+            self._rubber_band.setGeometry(
+                QRect(self._drag_start, event.pos()).normalized()
+            )
+
+    def mouseReleaseEvent(self, event):
+        if self._rubber_band:
+            rect = self._rubber_band.geometry()
+            self._rubber_band.hide()
+            self._rubber_band = None
+            if rect.width() > 5 and rect.height() > 5:
+                s = self._dpi_scale
+                pdf_rect = (
+                    rect.x() / s, rect.y() / s,
+                    (rect.x() + rect.width()) / s,
+                    (rect.y() + rect.height()) / s,
+                )
+                self.box_drawn.emit(self.page_num, pdf_rect)
+
+
+class SaveWorker(QThread):
+    """Saves redacted PDFs in background."""
+    progress = Signal(int, int)
+    finished = Signal(int, str)  # count_saved, output_folder
+
+    def __init__(self, files_and_boxes: list, output_folder: str, parent=None):
+        super().__init__(parent)
+        self._items = files_and_boxes  # [(filepath, [RedactionBox])]
+        self._output_folder = output_folder
+
+    def run(self):
+        total = len(self._items)
+        saved = 0
+        for idx, (filepath, boxes) in enumerate(self._items):
+            self.progress.emit(idx + 1, total)
+            try:
+                doc = fitz.open(filepath)
+                for box in boxes:
+                    page = doc[box.page_num]
+                    r = fitz.Rect(*box.pdf_rect)
+                    page.add_redact_annot(r)
+                for page in doc:
+                    page.apply_redactions()
+                stem = os.path.splitext(os.path.basename(filepath))[0]
+                out_path = os.path.join(self._output_folder, f"{stem}_REDACTED.pdf")
+                doc.save(out_path, garbage=4, deflate=True)
+                doc.close()
+                saved += 1
+            except Exception as e:
+                logger.debug("Save redaction error for %s: %s", filepath, e)
+        self.finished.emit(saved, self._output_folder)
+
+
+class PrivacyTab(QWidget):
+    """Tab 2 — Privacy Redaction with PDF viewer and redaction tools."""
+
+    # Signal to send files to Tab 3
+    send_to_extraction = Signal(list)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAcceptDrops(True)
+        self._files: List[str] = []
+        self._current_file: Optional[str] = None
+        self._redactions: Dict[str, List[RedactionBox]] = {}  # filepath -> boxes
+        self._page_widgets: List[PageWidget] = []
+        self._dpi = _DEFAULT_DPI
+        self._draw_mode = False
+        self._erase_mode = False
+        self._output_folder: Optional[str] = None
+        self._saved_files: List[str] = []
+        self._worker = None
+        self._save_worker = None
+        self._build_ui()
 
     def _build_ui(self):
         root = QVBoxLayout(self)
-        root.setContentsMargins(16, 16, 16, 16)
-        root.setSpacing(12)
+        root.setContentsMargins(8, 8, 8, 8)
+        root.setSpacing(6)
 
-        # Title
-        title = QLabel("Privacy Redaction")
-        title.setObjectName("titleLabel")
-        root.addWidget(title)
+        # spaCy warning if missing
+        if not _HAS_SPACY:
+            warn = QLabel("spaCy not available — using regex-only PII detection. "
+                          "Install: pip install spacy && python -m spacy download en_core_web_sm")
+            warn.setWordWrap(True)
+            warn.setStyleSheet("padding: 6px; border: 1px solid #f38ba8; border-radius: 4px;")
+            root.addWidget(warn)
 
-        subtitle = QLabel(
-            "Scan a folder of PDFs for personally identifiable information and "
-            "replace with anonymised tokens."
-        )
-        subtitle.setObjectName("subtitleLabel")
-        subtitle.setWordWrap(True)
-        root.addWidget(subtitle)
+        # Top section: drop zone + file list
+        top_splitter = QSplitter(Qt.Horizontal)
 
-        # --- Input group ---
-        input_group = QGroupBox("Scan Settings")
-        input_layout = QVBoxLayout(input_group)
+        # Drop zone (left)
+        self._drop_zone = DropZone()
+        self._drop_zone.files_dropped.connect(self._add_files)
+        self._drop_zone.clicked.connect(self._browse_files)
+        top_splitter.addWidget(self._drop_zone)
 
-        # Folder row
-        folder_row = QHBoxLayout()
-        folder_row.addWidget(QLabel("Folder:"))
-        self._folder_edit = QLineEdit()
-        self._folder_edit.setPlaceholderText("Select folder containing PDFs...")
-        folder_row.addWidget(self._folder_edit, 1)
-        browse_btn = QPushButton("Browse...")
-        browse_btn.clicked.connect(self._browse_folder)
-        folder_row.addWidget(browse_btn)
-        input_layout.addLayout(folder_row)
+        # File list (right)
+        file_panel = QWidget()
+        fp_layout = QVBoxLayout(file_panel)
+        fp_layout.setContentsMargins(0, 0, 0, 0)
+        fp_header = QHBoxLayout()
+        fp_header.addWidget(QLabel("Files"))
+        clear_btn = QPushButton("Clear All")
+        clear_btn.clicked.connect(self._clear_files)
+        fp_header.addWidget(clear_btn)
+        fp_layout.addLayout(fp_header)
+        self._file_list = QListWidget()
+        self._file_list.currentRowChanged.connect(self._on_file_selected)
+        fp_layout.addWidget(self._file_list)
+        top_splitter.addWidget(file_panel)
+        top_splitter.setSizes([350, 250])
+        root.addWidget(top_splitter)
 
-        # Firm name row
-        firm_row = QHBoxLayout()
-        firm_row.addWidget(QLabel("Firm Name:"))
-        self._firm_edit = QLineEdit("ClaimsCo Pty Ltd")
-        firm_row.addWidget(self._firm_edit, 1)
-        input_layout.addLayout(firm_row)
+        # Toolbar
+        toolbar = QHBoxLayout()
+        self._auto_btn = QPushButton("Auto Redact")
+        self._auto_btn.setObjectName("primaryButton")
+        self._auto_btn.clicked.connect(self._auto_redact)
+        toolbar.addWidget(self._auto_btn)
 
-        # Matter reference row
-        matter_row = QHBoxLayout()
-        matter_row.addWidget(QLabel("Matter Ref:"))
-        self._matter_edit = QLineEdit()
-        self._matter_edit.setPlaceholderText("e.g. MAT-2026-0042")
-        matter_row.addWidget(self._matter_edit, 1)
-        input_layout.addLayout(matter_row)
+        self._draw_btn = QToolButton()
+        self._draw_btn.setText("Draw Box")
+        self._draw_btn.setCheckable(True)
+        self._draw_btn.toggled.connect(self._toggle_draw)
+        toolbar.addWidget(self._draw_btn)
 
-        root.addWidget(input_group)
+        self._erase_btn = QToolButton()
+        self._erase_btn.setText("Erase Box")
+        self._erase_btn.setCheckable(True)
+        self._erase_btn.toggled.connect(self._toggle_erase)
+        toolbar.addWidget(self._erase_btn)
 
-        # --- Action row ---
-        action_row = QHBoxLayout()
-        self._scan_btn = QPushButton("Scan && Redact All PDFs")
-        self._scan_btn.setObjectName("primaryButton")
-        self._scan_btn.clicked.connect(self._start_scan)
-        action_row.addWidget(self._scan_btn)
-        action_row.addStretch()
-        root.addLayout(action_row)
+        zoom_in = QPushButton("+Zoom")
+        zoom_in.clicked.connect(lambda: self._zoom(30))
+        toolbar.addWidget(zoom_in)
+        zoom_out = QPushButton("-Zoom")
+        zoom_out.clicked.connect(lambda: self._zoom(-30))
+        toolbar.addWidget(zoom_out)
 
-        # --- Progress bar ---
         self._progress = QProgressBar()
         self._progress.setVisible(False)
-        self._progress.setTextVisible(True)
-        root.addWidget(self._progress)
+        toolbar.addWidget(self._progress, 1)
+        toolbar.addStretch()
+        root.addLayout(toolbar)
 
-        # --- Stats row ---
-        stats_row = QHBoxLayout()
-        self._lbl_total_docs = QLabel("Documents: 0")
-        self._lbl_total_lines = QLabel("Total Lines: 0")
-        self._lbl_total_pii = QLabel("PII Tokens Found: 0")
-        for lbl in (self._lbl_total_docs, self._lbl_total_lines, self._lbl_total_pii):
-            lbl.setObjectName("subtitleLabel")
-            stats_row.addWidget(lbl)
-        stats_row.addStretch()
-        root.addLayout(stats_row)
+        # Main area: PDF viewer + redactions panel
+        main_splitter = QSplitter(Qt.Horizontal)
 
-        # --- Results table ---
-        self._table = QTableWidget(0, 4)
-        self._table.setHorizontalHeaderLabels([
-            "Filename", "Lines Processed", "PII Tokens Created", "Status"
-        ])
-        self._table.horizontalHeader().setStretchLastSection(True)
-        self._table.horizontalHeader().setSectionResizeMode(
-            0, QHeaderView.ResizeMode.Stretch
+        # PDF viewer (scrollable)
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._page_container = QWidget()
+        self._page_layout = QVBoxLayout(self._page_container)
+        self._page_layout.setSpacing(4)
+        self._page_layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
+        self._scroll.setWidget(self._page_container)
+        main_splitter.addWidget(self._scroll)
+
+        # Redactions panel (right)
+        redact_panel = QWidget()
+        rp_layout = QVBoxLayout(redact_panel)
+        rp_layout.setContentsMargins(4, 4, 4, 4)
+        rp_layout.addWidget(QLabel("Redactions"))
+        self._redact_list = QListWidget()
+        self._redact_list.itemClicked.connect(self._on_redact_item_clicked)
+        rp_layout.addWidget(self._redact_list)
+        self._no_redact_label = QLabel("No redactions yet.\nClick Auto Redact.")
+        self._no_redact_label.setObjectName("subtitleLabel")
+        self._no_redact_label.setAlignment(Qt.AlignCenter)
+        rp_layout.addWidget(self._no_redact_label)
+        main_splitter.addWidget(redact_panel)
+        main_splitter.setSizes([500, 200])
+        root.addWidget(main_splitter, 1)
+
+        # Bottom action bar
+        bottom = QHBoxLayout()
+        self._save_selected_btn = QPushButton("Redact && Save Selected")
+        self._save_selected_btn.clicked.connect(lambda: self._save_redacted(selected_only=True))
+        bottom.addWidget(self._save_selected_btn)
+
+        self._save_all_btn = QPushButton("Redact && Save All")
+        self._save_all_btn.setObjectName("primaryButton")
+        self._save_all_btn.clicked.connect(lambda: self._save_redacted(selected_only=False))
+        bottom.addWidget(self._save_all_btn)
+
+        self._status_label = QLabel("")
+        bottom.addWidget(self._status_label, 1)
+
+        self._send_btn = QPushButton("Send to Claude Extraction Pack \u2192")
+        self._send_btn.setVisible(False)
+        self._send_btn.clicked.connect(self._send_to_extraction)
+        bottom.addWidget(self._send_btn)
+        root.addLayout(bottom)
+
+    # ── File management ──
+
+    def load_files(self, paths: list):
+        """Public method to load files from another tab."""
+        self._add_files(paths)
+
+    def _add_files(self, paths: list):
+        for p in paths:
+            if p not in self._files:
+                self._files.append(p)
+                item = QListWidgetItem(os.path.basename(p))
+                item.setData(Qt.UserRole, p)
+                item.setToolTip(p)
+                self._file_list.addItem(item)
+                if p not in self._redactions:
+                    self._redactions[p] = []
+        self._drop_zone.set_count(len(self._files))
+        if self._files and not self._current_file:
+            self._file_list.setCurrentRow(0)
+
+    def _clear_files(self):
+        self._files.clear()
+        self._redactions.clear()
+        self._file_list.clear()
+        self._current_file = None
+        self._clear_viewer()
+        self._drop_zone.set_count(0)
+
+    def _browse_files(self):
+        files, _ = QFileDialog.getOpenFileNames(
+            self, "Select PDFs", "", "PDF Files (*.pdf)"
         )
-        for col in (1, 2):
-            self._table.horizontalHeader().setSectionResizeMode(
-                col, QHeaderView.ResizeMode.ResizeToContents
-            )
-        self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self._table.setAlternatingRowColors(True)
-        self._table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        root.addWidget(self._table, 1)
+        if files:
+            self._add_files(files)
 
-        # --- Bottom buttons ---
-        bottom_row = QHBoxLayout()
-        self._download_btn = QPushButton("Download Redacted Pack (.txt)")
-        self._download_btn.setEnabled(False)
-        self._download_btn.clicked.connect(self._download_pack)
-        bottom_row.addWidget(self._download_btn)
-
-        self._view_map_btn = QPushButton("View Token Map")
-        self._view_map_btn.setEnabled(False)
-        self._view_map_btn.clicked.connect(self._view_token_map)
-        bottom_row.addWidget(self._view_map_btn)
-
-        bottom_row.addStretch()
-        root.addLayout(bottom_row)
-
-    # ---- Slots -----------------------------------------------------------
-
-    def _browse_folder(self):
-        folder = QFileDialog.getExistingDirectory(
-            self, "Select PDF Folder", self._folder_edit.text()
-        )
-        if folder:
-            self._folder_edit.setText(folder)
-
-    def _start_scan(self):
-        folder = self._folder_edit.text().strip()
-        if not folder or not os.path.isdir(folder):
-            QMessageBox.warning(
-                self, "Invalid Folder",
-                "Please select a valid folder containing PDF files."
-            )
+    def _on_file_selected(self, row: int):
+        if row < 0:
             return
+        item = self._file_list.item(row)
+        if not item:
+            return
+        path = item.data(Qt.UserRole)
+        if path != self._current_file:
+            self._current_file = path
+            self._render_file(path)
+            self._update_redactions_panel()
 
-        # Reset state
-        self._results.clear()
-        self._token_map.clear()
-        self._table.setRowCount(0)
-        self._update_stats()
-        self._download_btn.setEnabled(False)
-        self._view_map_btn.setEnabled(False)
-        self._scan_btn.setEnabled(False)
+    # ── PDF rendering ──
 
-        self._progress.setValue(0)
+    def _clear_viewer(self):
+        for pw in self._page_widgets:
+            pw.deleteLater()
+        self._page_widgets.clear()
+
+    def _render_file(self, filepath: str):
+        self._clear_viewer()
+        try:
+            doc = fitz.open(filepath)
+            scale = self._dpi / 72.0
+            mat = fitz.Matrix(scale, scale)
+            for page_num in range(len(doc)):
+                page = doc[page_num]
+                pix = page.get_pixmap(matrix=mat)
+                img = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format_RGB888)
+                pixmap = QPixmap.fromImage(img)
+
+                pw = PageWidget(page_num)
+                pw.set_pixmap(pixmap, scale)
+                pw.set_boxes(self._redactions.get(filepath, []))
+                pw.box_drawn.connect(self._on_box_drawn)
+                pw.box_clicked.connect(self._on_box_clicked)
+                if self._draw_mode:
+                    pw.set_drawing_mode(True)
+                if self._erase_mode:
+                    pw.set_erasing_mode(True)
+                self._page_layout.addWidget(pw)
+                self._page_widgets.append(pw)
+            doc.close()
+        except Exception as e:
+            logger.debug("Render error: %s", e)
+            lbl = QLabel(f"Error rendering: {e}")
+            self._page_layout.addWidget(lbl)
+
+    # ── Toolbar actions ──
+
+    def _auto_redact(self):
+        if not self._current_file:
+            QMessageBox.information(self, "No File", "Select a PDF file first.")
+            return
         self._progress.setVisible(True)
-
-        self._worker = RedactionWorker(
-            folder=folder,
-            firm_name=self._firm_edit.text().strip(),
-            matter_ref=self._matter_edit.text().strip(),
-            parent=self,
-        )
-        self._worker.progress.connect(self._on_progress)
-        self._worker.file_done.connect(self._on_file_done)
-        self._worker.finished.connect(self._on_finished)
-        self._worker.error.connect(self._on_error)
+        self._progress.setValue(0)
+        self._auto_btn.setEnabled(False)
+        self._worker = AutoRedactWorker(self._current_file)
+        self._worker.progress.connect(lambda c, t: (
+            self._progress.setMaximum(t), self._progress.setValue(c)
+        ))
+        self._worker.page_done.connect(self._on_auto_page_done)
+        self._worker.finished.connect(self._on_auto_finished)
         self._worker.start()
 
-    def _on_progress(self, current: int, total: int):
-        self._progress.setMaximum(total)
-        self._progress.setValue(current)
-        self._progress.setFormat(f"Processing {current}/{total} files...")
+    def _on_auto_page_done(self, page_num: int, boxes: list):
+        if self._current_file:
+            existing = self._redactions.setdefault(self._current_file, [])
+            existing.extend(boxes)
 
-    def _on_file_done(self, index: int, result: FileResult):
-        row = self._table.rowCount()
-        self._table.insertRow(row)
-        self._table.setItem(row, 0, QTableWidgetItem(result.filename))
-        self._table.setItem(
-            row, 1, QTableWidgetItem(str(result.lines_processed))
-        )
-        self._table.setItem(
-            row, 2, QTableWidgetItem(str(result.pii_tokens_found))
-        )
-        self._table.setItem(row, 3, QTableWidgetItem(result.status))
-
-        # Right-align numeric columns
-        for col in (1, 2):
-            item = self._table.item(row, col)
-            if item:
-                item.setTextAlignment(
-                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-                )
-
-    def _on_finished(self, results: List[FileResult], token_map: Dict[str, str]):
-        self._results = results
-        self._token_map = token_map
-        self._progress.setValue(self._progress.maximum())
-        self._progress.setFormat("Complete")
-        self._scan_btn.setEnabled(True)
-        self._download_btn.setEnabled(True)
-        self._view_map_btn.setEnabled(bool(token_map))
-        self._update_stats()
-        self._worker = None
-
-    def _on_error(self, message: str):
+    def _on_auto_finished(self):
         self._progress.setVisible(False)
-        self._scan_btn.setEnabled(True)
-        QMessageBox.critical(self, "Redaction Error", message)
+        self._auto_btn.setEnabled(True)
         self._worker = None
-
-    def _update_stats(self):
-        total_docs = len(self._results)
-        total_lines = sum(r.lines_processed for r in self._results)
-        total_pii = sum(r.pii_tokens_found for r in self._results)
-        self._lbl_total_docs.setText(f"Documents: {total_docs}")
-        self._lbl_total_lines.setText(f"Total Lines: {total_lines}")
-        self._lbl_total_pii.setText(f"PII Tokens Found: {total_pii}")
-
-    def _download_pack(self):
-        if not self._results:
-            return
-        path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Save Redacted Pack",
-            "redacted_pack.txt",
-            "Text Files (*.txt)",
-        )
-        if not path:
-            return
+        # Re-render to show boxes
+        if self._current_file:
+            self._render_file(self._current_file)
+            self._update_redactions_panel()
+        # Groq second pass
         try:
-            with open(path, "w", encoding="utf-8") as fh:
-                for result in self._results:
-                    for line in result.redacted_lines:
-                        fh.write(f"[{result.filename}] {line}\n")
-            QMessageBox.information(
-                self, "Export Complete",
-                f"Redacted pack saved to:\n{path}"
-            )
-        except Exception as exc:
-            QMessageBox.critical(
-                self, "Export Error", f"Failed to save file:\n{exc}"
-            )
+            from src.services.ai_redactor import groq_redactor
+            from src.services.ai_classifier import groq_classifier
+            if groq_classifier.is_available() and self._current_file:
+                doc = fitz.open(self._current_file)
+                lines = []
+                for page in doc:
+                    lines.extend(page.get_text().splitlines())
+                doc.close()
+                missed = groq_redactor.redact_pass(lines)
+                if missed:
+                    doc2 = fitz.open(self._current_file)
+                    for pii_text in missed:
+                        for page_num in range(len(doc2)):
+                            rects = doc2[page_num].search_for(pii_text)
+                            for r in rects:
+                                self._redactions.setdefault(self._current_file, []).append(
+                                    RedactionBox(page_num, (r.x0, r.y0, r.x1, r.y1), "AUTO", pii_text)
+                                )
+                    doc2.close()
+                    self._render_file(self._current_file)
+                    self._update_redactions_panel()
+        except Exception:
+            pass
 
-    def _view_token_map(self):
-        dlg = TokenMapDialog(self._token_map, parent=self)
-        dlg.exec()
+    def _toggle_draw(self, checked: bool):
+        self._draw_mode = checked
+        if checked:
+            self._erase_btn.setChecked(False)
+        for pw in self._page_widgets:
+            pw.set_drawing_mode(checked)
+
+    def _toggle_erase(self, checked: bool):
+        self._erase_mode = checked
+        if checked:
+            self._draw_btn.setChecked(False)
+        for pw in self._page_widgets:
+            pw.set_erasing_mode(checked)
+
+    def _zoom(self, delta: int):
+        self._dpi = max(_MIN_DPI, min(_MAX_DPI, self._dpi + delta))
+        if self._current_file:
+            self._render_file(self._current_file)
+
+    def _on_box_drawn(self, page_num: int, pdf_rect: tuple):
+        if self._current_file:
+            box = RedactionBox(page_num, pdf_rect, "MANUAL", "")
+            self._redactions.setdefault(self._current_file, []).append(box)
+            self._render_file(self._current_file)
+            self._update_redactions_panel()
+
+    def _on_box_clicked(self, page_num: int, point: QPoint):
+        # Erase mode: find and remove the box containing this point
+        if not self._current_file:
+            return
+        px, py = point.x() / 100.0, point.y() / 100.0
+        boxes = self._redactions.get(self._current_file, [])
+        for i, box in enumerate(boxes):
+            if box.page_num != page_num:
+                continue
+            x0, y0, x1, y1 = box.pdf_rect
+            if x0 <= px <= x1 and y0 <= py <= y1:
+                boxes.pop(i)
+                self._render_file(self._current_file)
+                self._update_redactions_panel()
+                return
+
+    # ── Redactions panel ──
+
+    def _update_redactions_panel(self):
+        self._redact_list.clear()
+        if not self._current_file:
+            self._no_redact_label.setVisible(True)
+            return
+        boxes = self._redactions.get(self._current_file, [])
+        self._no_redact_label.setVisible(len(boxes) == 0)
+        for i, box in enumerate(boxes):
+            label = f"Page {box.page_num + 1}  [{box.type}]"
+            if box.text:
+                label += f'  "{box.text[:30]}"'
+            else:
+                label += "  Manual box"
+            item = QListWidgetItem(label)
+            item.setData(Qt.UserRole, i)
+            self._redact_list.addItem(item)
+
+    def _on_redact_item_clicked(self, item: QListWidgetItem):
+        idx = item.data(Qt.UserRole)
+        if self._current_file and idx is not None:
+            boxes = self._redactions.get(self._current_file, [])
+            if 0 <= idx < len(boxes):
+                # Scroll to that page
+                page_num = boxes[idx].page_num
+                if page_num < len(self._page_widgets):
+                    self._scroll.ensureWidgetVisible(self._page_widgets[page_num])
+
+    # ── Save ──
+
+    def _save_redacted(self, selected_only: bool):
+        if selected_only:
+            items = [(self._current_file, self._redactions.get(self._current_file, []))]
+            if not self._current_file:
+                return
+        else:
+            items = [(f, self._redactions.get(f, [])) for f in self._files]
+
+        if not self._output_folder:
+            folder = QFileDialog.getExistingDirectory(self, "Select Output Folder")
+            if not folder:
+                return
+            self._output_folder = folder
+
+        self._progress.setVisible(True)
+        self._progress.setValue(0)
+        self._save_all_btn.setEnabled(False)
+        self._save_selected_btn.setEnabled(False)
+        self._save_worker = SaveWorker(items, self._output_folder)
+        self._save_worker.progress.connect(
+            lambda c, t: (self._progress.setMaximum(t), self._progress.setValue(c))
+        )
+        self._save_worker.finished.connect(self._on_save_finished)
+        self._save_worker.start()
+
+    def _on_save_finished(self, count: int, folder: str):
+        self._progress.setVisible(False)
+        self._save_all_btn.setEnabled(True)
+        self._save_selected_btn.setEnabled(True)
+        self._save_worker = None
+        self._status_label.setText(f"Saved {count} file(s) to {folder}")
+        # Collect saved file paths
+        self._saved_files = []
+        for f in self._files:
+            stem = os.path.splitext(os.path.basename(f))[0]
+            redacted = os.path.join(folder, f"{stem}_REDACTED.pdf")
+            if os.path.exists(redacted):
+                self._saved_files.append(redacted)
+        self._send_btn.setVisible(bool(self._saved_files))
+        # Update file list badges
+        for i in range(self._file_list.count()):
+            item = self._file_list.item(i)
+            path = item.data(Qt.UserRole)
+            stem = os.path.splitext(os.path.basename(path))[0]
+            if os.path.exists(os.path.join(folder, f"{stem}_REDACTED.pdf")):
+                item.setText(f"Saved {os.path.basename(path)}")
+
+    def _send_to_extraction(self):
+        if self._saved_files:
+            self.send_to_extraction.emit(self._saved_files)
+
+    # ── Drag and drop on the tab itself ──
+
+    def dragEnterEvent(self, event: QDragEnterEvent):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+
+    def dropEvent(self, event: QDropEvent):
+        files = []
+        for url in event.mimeData().urls():
+            path = url.toLocalFile()
+            if path.lower().endswith(".pdf"):
+                files.append(path)
+            elif os.path.isdir(path):
+                for root, _, fns in os.walk(path):
+                    for fn in fns:
+                        if fn.lower().endswith(".pdf"):
+                            files.append(os.path.join(root, fn))
+        if files:
+            self._add_files(files)

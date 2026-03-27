@@ -297,6 +297,14 @@ class MainWindow(QMainWindow):
         action_bar.addWidget(undo_btn)
 
         left_layout.addLayout(action_bar)
+
+        # "Send to Privacy Redaction" button (hidden until rename completes)
+        self._send_to_redact_btn = QPushButton("Send renamed files to Privacy Redaction \u2192")
+        self._send_to_redact_btn.setObjectName("primaryButton")
+        self._send_to_redact_btn.setVisible(False)
+        self._send_to_redact_btn.clicked.connect(self._send_to_privacy)
+        left_layout.addWidget(self._send_to_redact_btn)
+
         splitter.addWidget(left)
 
         # Right: preview pane
@@ -310,6 +318,7 @@ class MainWindow(QMainWindow):
 
         # Tab 2 — Privacy Redaction
         self._privacy_tab = PrivacyTab()
+        self._privacy_tab.send_to_extraction.connect(self._receive_for_extraction)
         self._tabs.addTab(self._privacy_tab, "Privacy Redaction")
 
         # Tab 3 — Claude Extraction Pack
@@ -615,6 +624,8 @@ class MainWindow(QMainWindow):
                 self, "Rename Errors",
                 f"{err_count} files had errors. Check the status column for details."
             )
+        if success > 0:
+            self._send_to_redact_btn.setVisible(True)
 
     def _undo_batch(self):
         reply = QMessageBox.question(
@@ -645,6 +656,25 @@ class MainWindow(QMainWindow):
     def _open_history(self):
         dlg = HistoryDialog(self)
         dlg.exec_()
+
+    # ── Cross-tab sends ──
+
+    def _send_to_privacy(self):
+        """Send successfully renamed files to Privacy Redaction tab."""
+        records = self._model.get_records()
+        from src.core.models import RenameStatus
+        renamed_paths = [
+            r.new_file_path for r in records
+            if r.rename_status == RenameStatus.RENAMED and r.new_file_path
+        ]
+        if renamed_paths:
+            self._privacy_tab.load_files(renamed_paths)
+            self._tabs.setCurrentWidget(self._privacy_tab)
+
+    def _receive_for_extraction(self, paths: list):
+        """Receive files from Privacy Redaction for Extraction tab."""
+        self._extraction_tab.load_files(paths)
+        self._tabs.setCurrentWidget(self._extraction_tab)
 
     # ── Corrections ──
 
