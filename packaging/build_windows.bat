@@ -49,7 +49,7 @@ if defined ISCC_PATH (
     echo [4/4] Building installer with Inno Setup...
     "%ISCC_PATH%" packaging\installer.iss
     echo.
-    echo Installer created: installer_output\ClaimsCo_Tools_Setup_2.0.0.exe
+    echo Installer created: installer_output\ClaimsCo_Tools_Setup_v2.0.1.exe
 ) else (
     echo [4/4] Inno Setup not found. Skipping installer creation.
     echo       Install Inno Setup from https://jrsoftware.org/isdl.php
