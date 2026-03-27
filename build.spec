@@ -35,6 +35,10 @@ a = Analysis(
         'PIL',
         'PIL.Image',
         'PIL.ImageDraw',
+        # Word documents
+        'docx',
+        'docx.document',
+        'docx.oxml',
         # src package
         'src',
         'src.core',

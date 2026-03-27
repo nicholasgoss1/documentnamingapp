@@ -75,6 +75,14 @@ try:
 except ImportError:
     _HAS_PDF2IMAGE = False
 
+try:
+    from docx import Document as DocxDocument
+    _HAS_DOCX = True
+except ImportError:
+    _HAS_DOCX = False
+
+# File types the extractor handles
+SUPPORTED_EXTENSIONS = (".pdf", ".txt", ".docx")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # REDACTION PATTERNS
@@ -887,7 +895,7 @@ class ExtractionWorker(QThread):
             path = os.path.join(self.folder, fn)
 
             try:
-                pages_text, method = self._extract_pdf(path)
+                pages_text, method = self._extract_file(path)
             except Exception as e:
                 self.log_line.emit(f"  ERROR: {e}")
                 content_blocks.append(
@@ -980,6 +988,42 @@ class ExtractionWorker(QThread):
         })
 
     # ── Extraction helpers ────────────────────────────────────────────────────
+
+    def _extract_file(self, path: str):
+        """
+        Dispatch to the correct extractor based on file extension.
+        Returns (list_of_page_text_strings, method_description).
+        """
+        ext = os.path.splitext(path)[1].lower()
+        if ext == ".txt":
+            return self._extract_txt(path)
+        elif ext == ".docx":
+            return self._extract_docx(path)
+        else:
+            return self._extract_pdf(path)
+
+    def _extract_txt(self, path: str):
+        """Read a plain-text file. Returns it as a single page."""
+        encodings = ["utf-8", "utf-8-sig", "cp1252", "latin-1"]
+        for enc in encodings:
+            try:
+                with open(path, "r", encoding=enc) as f:
+                    text = f.read()
+                return [text], "txt"
+            except (UnicodeDecodeError, LookupError):
+                continue
+        raise RuntimeError("Could not decode text file (tried utf-8, cp1252, latin-1).")
+
+    def _extract_docx(self, path: str):
+        """Extract text from a Word .docx file. Returns paragraphs as a single page."""
+        if not _HAS_DOCX:
+            raise RuntimeError(
+                "python-docx is not installed. Run: pip install python-docx"
+            )
+        doc   = DocxDocument(path)
+        lines = [para.text for para in doc.paragraphs if para.text.strip()]
+        text  = "\n".join(lines)
+        return [text], "docx"
 
     def _extract_pdf(self, path: str):
         """
@@ -1097,6 +1141,9 @@ class ExtractionTab(QWidget):
             "pdfplumber: OK" if _HAS_PDFPLUMBER else "pdfplumber: NOT INSTALLED"
         )
         dep_items.append(
+            "python-docx: OK" if _HAS_DOCX else "python-docx: NOT INSTALLED"
+        )
+        dep_items.append(
             "Tesseract OCR: OK" if _HAS_TESSERACT
             else "Tesseract OCR: not found (OCR disabled)"
         )
@@ -1166,20 +1213,21 @@ class ExtractionTab(QWidget):
     def _populate_inventory(self):
         self._file_list.clear()
         try:
-            pdfs = sorted(
+            files = sorted(
                 f for f in os.listdir(self.folder)
-                if f.lower().endswith(".pdf")
+                if os.path.splitext(f)[1].lower() in SUPPORTED_EXTENSIONS
             )
         except Exception as e:
             self._log_append(f"ERROR reading folder: {e}")
             return
 
-        if not pdfs:
-            self._log_append("No PDF files found.")
+        if not files:
+            self._log_append(
+                "No supported files found (PDF, TXT, DOCX).")
             return
 
         skipped = 0
-        for fn in pdfs:
+        for fn in files:
             path = os.path.join(self.folder, fn)
             try:
                 size_mb = os.path.getsize(path) / 1_048_576
@@ -1195,9 +1243,9 @@ class ExtractionTab(QWidget):
 
             self._file_list.addItem(QListWidgetItem(label))
 
-        extract_count = len(pdfs) - skipped
+        extract_count = len(files) - skipped
         self._log_append(
-            f"Found {len(pdfs)} PDF(s).  "
+            f"Found {len(files)} file(s) (PDF/TXT/DOCX).  "
             f"{extract_count} to extract, {skipped} skipped (internal notes)."
         )
 
@@ -1209,29 +1257,32 @@ class ExtractionTab(QWidget):
             return
 
         try:
-            all_pdfs = sorted(
+            all_files = sorted(
                 f for f in os.listdir(self.folder)
-                if f.lower().endswith(".pdf")
+                if os.path.splitext(f)[1].lower() in SUPPORTED_EXTENSIONS
             )
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Cannot read folder:\n{e}")
             return
 
-        if not all_pdfs:
-            QMessageBox.information(self, "No Files", "No PDF files found.")
+        if not all_files:
+            QMessageBox.information(
+                self, "No Files",
+                "No supported files found (PDF, TXT, DOCX)."
+            )
             return
 
         # Build (filename, classification) entries for all files
         # (the worker skips internal notes internally)
-        file_entries = [(fn, classify_pdf(fn)) for fn in all_pdfs]
+        file_entries = [(fn, classify_pdf(fn)) for fn in all_files]
         processable  = [
-            fn for fn in all_pdfs if not is_internal_notes(fn)
+            fn for fn in all_files if not is_internal_notes(fn)
         ]
 
         if not processable:
             QMessageBox.information(
                 self, "All Skipped",
-                "All PDF files in this folder are marked as internal notes "
+                "All files in this folder are marked as internal notes "
                 "and will be skipped."
             )
             return
