@@ -180,6 +180,26 @@
       "fields_corrected": [
         "who"
       ]
+    },
+    {
+      "timestamp": "2026-03-28T08:46:20.025078",
+      "original_filename": "Complainant - 23.12.2023 - WeatherWatch - Hail Report.pdf",
+      "text_snippet": "Hail Report for: 17a Railway Street,\nGatton QLD 4343, Australia\n-27.56216659694193,152.27505140420368\nPlease note this is an automatically generated report.\nPowered by Weatherwatch HailTracker. Hailtr",
+      "ai_result": {
+        "who": "FF",
+        "entity": "WeatherWatch",
+        "date": "23.12.2023",
+        "what": "Hail Report"
+      },
+      "corrected_result": {
+        "who": "Complainant",
+        "entity": "WeatherWatch",
+        "date": "23.12.2023",
+        "what": "Hail Report"
+      },
+      "fields_corrected": [
+        "who"
+      ]
     }
   ]
 }
