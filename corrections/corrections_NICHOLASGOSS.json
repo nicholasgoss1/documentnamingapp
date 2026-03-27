@@ -1,0 +1,1 @@
+{"version": "1.0", "corrections": [{"timestamp": "2026-03-27T10:00:00", "original_filename": "TEST - 27.03.2026 - Test - Entity.pdf", "text_snippet": "test snippet", "ai_result": {"who": "FF", "entity": "", "date": "27.03.2026", "what": "Test"}, "corrected_result": {"who": "FF", "entity": "TestCo", "date": "27.03.2026", "what": "Test"}, "fields_corrected": ["entity"]}]}
