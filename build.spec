@@ -76,8 +76,12 @@ a = Analysis(
         'pydantic',
         'pydantic_core',
         'annotated_types',
-        # spaCy
+        # spaCy (full set for PyInstaller bundling)
         'spacy',
+        'spacy.lang.en',
+        'spacy.pipeline',
+        'spacy.lexeme',
+        'spacy.tokens',
         'en_core_web_sm',
         'thinc',
         'blis',

@@ -21,21 +21,73 @@ from PySide6.QtWidgets import (
 
 logger = logging.getLogger(__name__)
 
-# Optional spaCy
+# ── spaCy loading (works in both dev and PyInstaller bundle) ──
 _HAS_SPACY = False
 _NLP = None
-try:
-    import spacy
-    _NLP = spacy.load("en_core_web_sm")
-    _HAS_SPACY = True
-except Exception:
-    pass
 
-# Regex patterns for PII
+
+def _load_spacy_model():
+    try:
+        import spacy
+        import sys
+        from pathlib import Path
+        # Try bundled path first (PyInstaller)
+        base = getattr(sys, '_MEIPASS', None)
+        if base:
+            model_path = Path(base) / "en_core_web_sm"
+            if model_path.exists():
+                return spacy.load(str(model_path))
+        # Try installed model
+        return spacy.load("en_core_web_sm")
+    except Exception as e:
+        logger.debug("spaCy load failed: %s", e)
+        return None
+
+
+_NLP = _load_spacy_model()
+_HAS_SPACY = _NLP is not None
+
+# ── Regex patterns for PII detection ──
 _RE_PHONE = re.compile(r'(\+?61[\s-]?)?(0\d[\s-]?)[\d\s-]{8,10}')
 _RE_POLICY = re.compile(r'\b[A-Z]{2,4}[-]?\d{6,12}\b')
 _RE_ACCOUNT = re.compile(r'\d{12,}')
-_RE_STREET = re.compile(r'\b\d{1,4}[A-Za-z]?\b(?=\s+[A-Z][a-z])')
+
+# Street number: handles "17A", "4/17", "Unit 3", etc.
+_RE_STREET = re.compile(
+    r'\b(?:Unit\s+|Lot\s+|Suite\s+|Level\s+)?'
+    r'(\d{1,4}[A-Za-z]?(?:/\d{1,4})?)'
+    r'\b(?=\s+[A-Z][a-z]+'
+    r'\s+(?:Street|St|Road|Rd|Avenue|Ave|Drive|Dr|'
+    r'Court|Ct|Place|Pl|Crescent|Cres|Boulevard|Blvd|'
+    r'Lane|Ln|Way|Terrace|Tce|Close|Cl|Highway|Hwy|'
+    r'Parade|Pde|Circuit|Cct|Grove|Gve))'
+)
+
+# Full Australian address: "17A Railway Street, Gatton QLD 4343"
+_RE_ADDRESS = re.compile(
+    r'\b\d{1,4}[A-Za-z]?\s+'
+    r'[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s*,?\s*'
+    r'[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+'
+    r'(?:QLD|NSW|VIC|WA|SA|TAS|ACT|NT)\s+'
+    r'\d{4}\b'
+)
+
+# Label-value pairs: "Name: Craig Toohill", "Address: 17A Railway St"
+_RE_LABEL_VALUE = re.compile(
+    r'^(?:Name|Address|Client|Insured(?:\s+Name)?|'
+    r'Customer|Owner|Claimant|Policy\s*Holder|'
+    r'Insured\s*Name|Report\s*For|Prepared\s*For)'
+    r'\s*:?\s*(.+)$',
+    re.MULTILINE | re.IGNORECASE
+)
+
+# Reference numbers near labels
+_RE_REF_LABEL = re.compile(
+    r'(?:Job\s*(?:Number|No|#)|Claim\s*(?:Number|No|#)|'
+    r'Reference|Ref\s*(?:No|#)|Policy\s*(?:Number|No))'
+    r'\s*:?\s*([A-Z0-9]{4,20}(?:[-/][A-Z0-9]+)?)',
+    re.IGNORECASE
+)
 
 # Default DPI for rendering
 _DEFAULT_DPI = 150
@@ -103,13 +155,31 @@ class AutoRedactWorker(QThread):
     """Background worker for auto-detecting PII in PDFs."""
     progress = Signal(int, int)  # current_page, total_pages
     page_done = Signal(int, list)  # page_num, list of RedactionBox
-    finished = Signal()
+    finished = Signal(dict)  # summary: {names, addresses, phones, refs, total}
 
     def __init__(self, file_path: str, parent=None):
         super().__init__(parent)
         self._file_path = file_path
 
+    def _search_and_add(self, page, page_num, pii_text, boxes, seen_rects):
+        """Search for PII text on page and add non-overlapping boxes."""
+        try:
+            rects = page.search_for(pii_text.strip())
+            for r in rects:
+                key = (page_num, round(r.x0, 1), round(r.y0, 1), round(r.x1, 1), round(r.y1, 1))
+                if key not in seen_rects:
+                    seen_rects.add(key)
+                    boxes.append(RedactionBox(
+                        page_num=page_num,
+                        pdf_rect=(r.x0, r.y0, r.x1, r.y1),
+                        type="AUTO",
+                        text=pii_text.strip(),
+                    ))
+        except Exception:
+            pass
+
     def run(self):
+        counts = {"names": 0, "addresses": 0, "phones": 0, "refs": 0, "total": 0}
         try:
             doc = fitz.open(self._file_path)
             total = len(doc)
@@ -118,44 +188,95 @@ class AutoRedactWorker(QThread):
                 page = doc[page_num]
                 text = page.get_text()
                 boxes = []
+                seen = set()  # dedup rects
 
-                # spaCy NER
+                # 1. spaCy PERSON entities (most reliable for names)
                 if _HAS_SPACY and _NLP:
                     try:
                         nlp_doc = _NLP(text)
                         for ent in nlp_doc.ents:
                             if ent.label_ == "PERSON" and len(ent.text.split()) >= 2:
-                                rects = page.search_for(ent.text)
-                                for r in rects:
-                                    boxes.append(RedactionBox(
-                                        page_num=page_num,
-                                        pdf_rect=(r.x0, r.y0, r.x1, r.y1),
-                                        type="AUTO",
-                                        text=ent.text,
-                                    ))
+                                before = len(boxes)
+                                self._search_and_add(page, page_num, ent.text, boxes, seen)
+                                counts["names"] += len(boxes) - before
                     except Exception:
                         pass
 
-                # Regex patterns
-                for pattern in [_RE_PHONE, _RE_POLICY, _RE_ACCOUNT]:
-                    for m in pattern.finditer(text):
+                # 2. Label-value pairs (Name: Craig Toohill, Address: ...)
+                try:
+                    for m in _RE_LABEL_VALUE.finditer(text):
+                        value = m.group(1).strip()
+                        if len(value) >= 3:
+                            before = len(boxes)
+                            self._search_and_add(page, page_num, value, boxes, seen)
+                            counts["names"] += len(boxes) - before
+                except Exception:
+                    pass
+
+                # 3. Full address pattern
+                try:
+                    for m in _RE_ADDRESS.finditer(text):
+                        before = len(boxes)
+                        self._search_and_add(page, page_num, m.group(), boxes, seen)
+                        counts["addresses"] += len(boxes) - before
+                except Exception:
+                    pass
+
+                # 4. Street number pattern
+                try:
+                    for m in _RE_STREET.finditer(text):
+                        before = len(boxes)
+                        self._search_and_add(page, page_num, m.group(), boxes, seen)
+                        counts["addresses"] += len(boxes) - before
+                except Exception:
+                    pass
+
+                # 5. Phone numbers
+                try:
+                    for m in _RE_PHONE.finditer(text):
                         matched = m.group().strip()
-                        if len(matched) < 4:
-                            continue
-                        rects = page.search_for(matched)
-                        for r in rects:
-                            boxes.append(RedactionBox(
-                                page_num=page_num,
-                                pdf_rect=(r.x0, r.y0, r.x1, r.y1),
-                                type="AUTO",
-                                text=matched,
-                            ))
+                        if len(matched) >= 8:
+                            before = len(boxes)
+                            self._search_and_add(page, page_num, matched, boxes, seen)
+                            counts["phones"] += len(boxes) - before
+                except Exception:
+                    pass
+
+                # 6. Policy/claim numbers
+                try:
+                    for m in _RE_POLICY.finditer(text):
+                        before = len(boxes)
+                        self._search_and_add(page, page_num, m.group(), boxes, seen)
+                        counts["refs"] += len(boxes) - before
+                except Exception:
+                    pass
+
+                # 7. Reference numbers near labels
+                try:
+                    for m in _RE_REF_LABEL.finditer(text):
+                        ref = m.group(1).strip()
+                        if len(ref) >= 4:
+                            before = len(boxes)
+                            self._search_and_add(page, page_num, ref, boxes, seen)
+                            counts["refs"] += len(boxes) - before
+                except Exception:
+                    pass
+
+                # 8. Account numbers
+                try:
+                    for m in _RE_ACCOUNT.finditer(text):
+                        before = len(boxes)
+                        self._search_and_add(page, page_num, m.group(), boxes, seen)
+                        counts["refs"] += len(boxes) - before
+                except Exception:
+                    pass
 
                 self.page_done.emit(page_num, boxes)
             doc.close()
         except Exception as e:
             logger.debug("Auto-redact error: %s", e)
-        self.finished.emit()
+        counts["total"] = counts["names"] + counts["addresses"] + counts["phones"] + counts["refs"]
+        self.finished.emit(counts)
 
 
 class PageWidget(QLabel):
@@ -372,6 +493,12 @@ class PrivacyTab(QWidget):
         toolbar.addStretch()
         root.addLayout(toolbar)
 
+        # Redaction summary (shown after auto-redact)
+        self._summary_label = QLabel("")
+        self._summary_label.setWordWrap(True)
+        self._summary_label.setVisible(False)
+        root.addWidget(self._summary_label)
+
         # Main area: PDF viewer + redactions panel
         main_splitter = QSplitter(Qt.Horizontal)
 
@@ -416,7 +543,7 @@ class PrivacyTab(QWidget):
         bottom.addWidget(self._status_label, 1)
 
         self._send_btn = QPushButton("Send to Claude Extraction Pack \u2192")
-        self._send_btn.setVisible(False)
+        self._send_btn.setEnabled(False)
         self._send_btn.clicked.connect(self._send_to_extraction)
         bottom.addWidget(self._send_btn)
         root.addLayout(bottom)
@@ -438,6 +565,7 @@ class PrivacyTab(QWidget):
                 if p not in self._redactions:
                     self._redactions[p] = []
         self._drop_zone.set_count(len(self._files))
+        self._send_btn.setEnabled(bool(self._files))
         if self._files and not self._current_file:
             self._file_list.setCurrentRow(0)
 
@@ -526,10 +654,29 @@ class PrivacyTab(QWidget):
             existing = self._redactions.setdefault(self._current_file, [])
             existing.extend(boxes)
 
-    def _on_auto_finished(self):
+    def _on_auto_finished(self, counts: dict):
         self._progress.setVisible(False)
         self._auto_btn.setEnabled(True)
         self._worker = None
+
+        # Show summary
+        total = counts.get("total", 0)
+        if total > 0:
+            parts = []
+            if counts.get("names"):
+                parts.append(f"{counts['names']} names")
+            if counts.get("addresses"):
+                parts.append(f"{counts['addresses']} addresses")
+            if counts.get("phones"):
+                parts.append(f"{counts['phones']} phone numbers")
+            if counts.get("refs"):
+                parts.append(f"{counts['refs']} reference numbers")
+            self._summary_label.setText(f"Found {total} items to redact: {', '.join(parts)}")
+            self._summary_label.setStyleSheet("padding: 6px; border: 1px solid #a6e3a1; border-radius: 4px;")
+        else:
+            self._summary_label.setText("No PII detected automatically. Use Draw Box to manually mark sensitive areas.")
+            self._summary_label.setStyleSheet("padding: 6px; border: 1px solid #f9e2af; border-radius: 4px;")
+        self._summary_label.setVisible(True)
         # Re-render to show boxes
         if self._current_file:
             self._render_file(self._current_file)
@@ -671,7 +818,7 @@ class PrivacyTab(QWidget):
             redacted = os.path.join(folder, f"{stem}_REDACTED.pdf")
             if os.path.exists(redacted):
                 self._saved_files.append(redacted)
-        self._send_btn.setVisible(bool(self._saved_files))
+        # saved_files populated for send-to-extraction to use redacted paths
         # Update file list badges
         for i in range(self._file_list.count()):
             item = self._file_list.item(i)
@@ -681,8 +828,10 @@ class PrivacyTab(QWidget):
                 item.setText(f"Saved {os.path.basename(path)}")
 
     def _send_to_extraction(self):
-        if self._saved_files:
-            self.send_to_extraction.emit(self._saved_files)
+        # Prefer saved redacted files if available, otherwise send originals
+        paths = self._saved_files if self._saved_files else self._files
+        if paths:
+            self.send_to_extraction.emit(paths)
 
     # ── Drag and drop on the tab itself ──
 

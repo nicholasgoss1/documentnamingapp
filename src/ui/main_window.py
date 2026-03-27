@@ -298,10 +298,10 @@ class MainWindow(QMainWindow):
 
         left_layout.addLayout(action_bar)
 
-        # "Send to Privacy Redaction" button (hidden until rename completes)
-        self._send_to_redact_btn = QPushButton("Send renamed files to Privacy Redaction \u2192")
+        # "Send to Privacy Redaction" button — always visible, disabled until files loaded
+        self._send_to_redact_btn = QPushButton("Send to Privacy Redaction \u2192")
         self._send_to_redact_btn.setObjectName("primaryButton")
-        self._send_to_redact_btn.setVisible(False)
+        self._send_to_redact_btn.setEnabled(False)
         self._send_to_redact_btn.clicked.connect(self._send_to_privacy)
         left_layout.addWidget(self._send_to_redact_btn)
 
@@ -396,6 +396,7 @@ class MainWindow(QMainWindow):
         self._file_count_label.setText(f"{count} files loaded")
         self.statusBar().showMessage(f"Done. {len(records)} new files processed. {count} total.")
         self._ai_label.setText(_ai_status_text())
+        self._send_to_redact_btn.setEnabled(count > 0)
         self._worker = None
 
     def _on_processing_error(self, msg: str):
@@ -660,12 +661,17 @@ class MainWindow(QMainWindow):
     # ── Cross-tab sends ──
 
     def _send_to_privacy(self):
-        """Send successfully renamed files to Privacy Redaction tab."""
+        """Send loaded files to Privacy Redaction tab. Prefers renamed paths if available."""
         records = self._model.get_records()
         from src.core.models import RenameStatus
-        renamed_paths = [
-            r.new_file_path for r in records
-            if r.rename_status == RenameStatus.RENAMED and r.new_file_path
+        # Use renamed path if available, otherwise original path
+        all_paths = []
+        for r in records:
+            if r.rename_status == RenameStatus.RENAMED and r.new_file_path:
+                all_paths.append(r.new_file_path)
+            elif r.file_path:
+                all_paths.append(r.file_path)
+        renamed_paths = [p for p in all_paths if p
         ]
         if renamed_paths:
             self._privacy_tab.load_files(renamed_paths)

@@ -2,10 +2,13 @@
 Document preview widget — renders PDF pages via PyMuPDF and shows
 plain-text / DOCX content as scrollable text.
 """
+import logging
 import os
 
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QPixmap, QImage
+
+logger = logging.getLogger(__name__)
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QScrollArea,
     QSpinBox, QTextEdit, QStackedWidget,
@@ -155,17 +158,44 @@ class PdfPreviewWidget(QWidget):
     def _render_current(self):
         if not self._file_path:
             return
-        png_data = render_page_pixmap(self._file_path, self._current_page, zoom=1.5)
-        if png_data:
-            img = QImage.fromData(png_data)
-            pixmap = QPixmap.fromImage(img)
-            # Scale to fit width
-            max_w = self._scroll.viewport().width() - 20
-            if pixmap.width() > max_w:
-                pixmap = pixmap.scaledToWidth(max_w, Qt.SmoothTransformation)
-            self._image_label.setPixmap(pixmap)
-        else:
-            self._image_label.setText("Unable to render page")
+        try:
+            # Check for encrypted PDFs
+            import fitz
+            try:
+                doc = fitz.open(self._file_path)
+                if doc.is_encrypted:
+                    doc.close()
+                    self._image_label.setText("This PDF is password protected \u2014 preview unavailable")
+                    return
+                doc.close()
+            except Exception:
+                pass
+
+            # Try normal render
+            png_data = render_page_pixmap(self._file_path, self._current_page, zoom=1.5)
+
+            # Retry at lower DPI if first attempt fails
+            if not png_data:
+                logger.debug("Preview render failed at 1.5x for page %d, retrying at 96 DPI", self._current_page)
+                png_data = render_page_pixmap(self._file_path, self._current_page, zoom=96/72)
+
+            # Try page 0 as last resort
+            if not png_data and self._current_page != 0:
+                logger.debug("Retrying with page 0")
+                png_data = render_page_pixmap(self._file_path, 0, zoom=96/72)
+
+            if png_data:
+                img = QImage.fromData(png_data)
+                pixmap = QPixmap.fromImage(img)
+                max_w = self._scroll.viewport().width() - 20
+                if pixmap.width() > max_w:
+                    pixmap = pixmap.scaledToWidth(max_w, Qt.SmoothTransformation)
+                self._image_label.setPixmap(pixmap)
+            else:
+                self._image_label.setText("Preview unavailable for this file")
+        except Exception as e:
+            logger.debug("Preview render error: %s", e)
+            self._image_label.setText("Preview unavailable for this file")
 
     def _prev_page(self):
         if self._current_page > 0:
