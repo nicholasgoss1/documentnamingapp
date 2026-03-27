@@ -40,47 +40,81 @@ Name: "{autodesktop}\ClaimsCo Document Tools"; Filename: "{app}\ClaimsCo_Tools.e
 Filename: "{app}\ClaimsCo_Tools.exe"; Description: "{cm:LaunchProgram,ClaimsCo Document Tools}"; Flags: nowait postinstall skipifsilent
 
 [Code]
-function GetUninstallString(): String;
+// ────────────────────────────────────────────────────────────────────────
+// Silent uninstall of ANY previous version by display name.
+//
+// Searches HKLM, HKCU, and WOW6432Node uninstall registry paths for
+// entries whose DisplayName starts with "Claim File Renamer" (old app)
+// or "ClaimsCo Document Tools" (current app, any version).
+//
+// This ensures v1.0 through v1.6 of the old app AND any prior v2.x
+// of the new app are silently removed before installing the new version.
+// ────────────────────────────────────────────────────────────────────────
+
+procedure UninstallByDisplayNamePrefix(RootKey: Integer; const BasePath: String; const Prefix: String);
 var
-  UninstallKey: String;
-  UninstallString: String;
+  SubKeys: TArrayOfString;
+  I: Integer;
+  KeyPath: String;
+  DisplayName: String;
+  UninstallCmd: String;
+  ResultCode: Integer;
 begin
-  Result := '';
-  UninstallKey := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#SetupSetting("AppId")}_is1';
-  if RegQueryStringValue(HKLM, UninstallKey, 'UninstallString', UninstallString) then
-    Result := UninstallString
-  else if RegQueryStringValue(HKCU, UninstallKey, 'UninstallString', UninstallString) then
-    Result := UninstallString;
+  if not RegGetSubkeyNames(RootKey, BasePath, SubKeys) then
+    Exit;
+
+  for I := 0 to GetArrayLength(SubKeys) - 1 do
+  begin
+    KeyPath := BasePath + '\' + SubKeys[I];
+
+    if not RegQueryStringValue(RootKey, KeyPath, 'DisplayName', DisplayName) then
+      Continue;
+
+    // Check if DisplayName starts with the target prefix (case-insensitive)
+    if Pos(Lowercase(Prefix), Lowercase(DisplayName)) <> 1 then
+      Continue;
+
+    // Found a match — try QuietUninstallString first, then UninstallString
+    if RegQueryStringValue(RootKey, KeyPath, 'QuietUninstallString', UninstallCmd) then
+    begin
+      Exec('>', '/C ' + UninstallCmd, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    end
+    else if RegQueryStringValue(RootKey, KeyPath, 'UninstallString', UninstallCmd) then
+    begin
+      Exec(RemoveQuotes(UninstallCmd), '/SILENT /NORESTART', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    end;
+  end;
 end;
 
-function GetInstalledVersion(): String;
+procedure RemoveAllPreviousVersions();
 var
-  UninstallKey: String;
-  DisplayVersion: String;
+  BasePaths: array[0..2] of String;
+  Prefixes: array[0..1] of String;
+  RootKeys: array[0..1] of Integer;
+  I, J, K: Integer;
 begin
-  Result := '';
-  UninstallKey := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#SetupSetting("AppId")}_is1';
-  if RegQueryStringValue(HKLM, UninstallKey, 'DisplayVersion', DisplayVersion) then
-    Result := DisplayVersion
-  else if RegQueryStringValue(HKCU, UninstallKey, 'DisplayVersion', DisplayVersion) then
-    Result := DisplayVersion;
+  // Registry base paths to search
+  BasePaths[0] := 'Software\Microsoft\Windows\CurrentVersion\Uninstall';
+  BasePaths[1] := 'SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall';
+  BasePaths[2] := 'Software\Microsoft\Windows\CurrentVersion\Uninstall';
+
+  // Display name prefixes to match (old app name + current app name)
+  Prefixes[0] := 'Claim File Renamer';
+  Prefixes[1] := 'ClaimsCo Document Tools';
+
+  // Root keys: HKLM and HKCU
+  RootKeys[0] := HKLM;
+  RootKeys[1] := HKCU;
+
+  for I := 0 to 1 do              // Each root key
+    for J := 0 to 2 do            // Each base path (native + WOW6432Node)
+      for K := 0 to 1 do          // Each display name prefix
+        UninstallByDisplayNamePrefix(RootKeys[I], BasePaths[J], Prefixes[K]);
 end;
 
 function InitializeSetup(): Boolean;
-var
-  UninstallString: String;
-  ResultCode: Integer;
 begin
   Result := True;
-  UninstallString := GetUninstallString();
-  // If a previous version exists, uninstall it silently before proceeding
-  if UninstallString <> '' then
-  begin
-    Exec(RemoveQuotes(UninstallString), '/SILENT', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    if GetUninstallString() <> '' then
-    begin
-      MsgBox('The previous version could not be removed. Setup will now exit.', mbError, MB_OK);
-      Result := False;
-    end;
-  end;
+  // Silently remove ALL previous versions of both old and new app names
+  RemoveAllPreviousVersions();
 end;
