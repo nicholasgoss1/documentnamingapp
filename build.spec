@@ -7,14 +7,7 @@ import importlib
 
 block_cipher = None
 
-# ── Locate spaCy model ──────────────────────────────────────────────
-_spacy_model_data = []
-try:
-    import en_core_web_sm
-    model_dir = os.path.dirname(en_core_web_sm.__file__)
-    _spacy_model_data.append((model_dir, 'en_core_web_sm'))
-except ImportError:
-    print("WARNING: en_core_web_sm not installed — Privacy Redaction NER will be disabled")
+# spaCy removed — using Groq for PII detection instead
 
 # ── Optional: bundle GitHub sync token and Groq key ──────────────────
 _extra_datas = []
@@ -40,7 +33,7 @@ a = Analysis(
     datas=[
         ('assets', 'assets'),
         ('src', 'src'),
-    ] + _spacy_model_data + _extra_datas,
+    ] + _extra_datas,
     hiddenimports=[
         # Qt
         'PySide6.QtCore',
@@ -76,29 +69,7 @@ a = Analysis(
         'pydantic',
         'pydantic_core',
         'annotated_types',
-        # spaCy (full set for PyInstaller bundling)
-        'spacy',
-        'spacy.lang.en',
-        'spacy.lang.en.stop_words',
-        'spacy.pipeline',
-        'spacy.pipeline.ner',
-        'spacy.tokenizer',
-        'spacy.lexeme',
-        'spacy.tokens',
-        'spacy.vocab',
-        'spacy.attrs',
-        'en_core_web_sm',
-        'thinc',
-        'thinc.backends',
-        'blis',
-        'cymem',
-        'murmurhash',
-        'preshed',
-        'srsly',
-        'wasabi',
-        'catalogue',
-        'confection',
-        'tqdm',
+        # spaCy removed — Groq handles PII detection
         # src package — all modules
         'src',
         'src.core',

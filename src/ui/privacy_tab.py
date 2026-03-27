@@ -21,82 +21,50 @@ from PySide6.QtWidgets import (
 
 logger = logging.getLogger(__name__)
 
-# ── spaCy loading (works in both dev and PyInstaller bundle) ──
-_HAS_SPACY = False
-_NLP = None
+# ── Groq PII detection (replaces spaCy) ──
 
-
-def _load_spacy_model():
-    import sys, os
-
+def _groq_available() -> bool:
     try:
-        import spacy
-    except ImportError:
-        logger.error("spaCy not installed")
-        return None
+        from src.services.ai_classifier import groq_classifier
+        return groq_classifier.is_available()
+    except Exception:
+        return False
 
-    # Build exhaustive list of candidate paths
-    candidates = []
 
-    # 1. PyInstaller _MEIPASS (temp extraction folder = _internal/)
-    meipass = getattr(sys, '_MEIPASS', None)
-    if meipass:
-        candidates.append(os.path.join(meipass, "en_core_web_sm"))
-
-    # 2. Next to the EXE
-    exe_dir = os.path.dirname(sys.executable)
-    candidates.append(os.path.join(exe_dir, "en_core_web_sm"))
-    candidates.append(os.path.join(exe_dir, "_internal", "en_core_web_sm"))
-
-    # 3. Walk up from this source file (dev mode)
-    src_dir = os.path.dirname(os.path.abspath(__file__))
-    for _ in range(4):
-        candidates.append(os.path.join(src_dir, "en_core_web_sm"))
-        src_dir = os.path.dirname(src_dir)
-
-    # Log diagnostics
-    logger.error("SPACY DIAGNOSTIC: _MEIPASS=%s", meipass)
-    logger.error("SPACY DIAGNOSTIC: exe_dir=%s", exe_dir)
-    for path in candidates:
-        logger.error("SPACY DIAGNOSTIC: candidate %s exists=%s", path, os.path.exists(path))
-
-    # Try each candidate — look for versioned subfolder with config.cfg
-    for path in candidates:
-        if not os.path.exists(path):
-            continue
-        # Try versioned subfolder first (en_core_web_sm-X.Y.Z/)
-        try:
-            for child in os.listdir(path):
-                child_path = os.path.join(path, child)
-                if os.path.isdir(child_path) and os.path.exists(os.path.join(child_path, "config.cfg")):
-                    try:
-                        nlp = spacy.load(child_path)
-                        logger.info("spaCy loaded from: %s", child_path)
-                        return nlp
-                    except Exception as e:
-                        logger.warning("spaCy load failed at %s: %s", child_path, e)
-        except Exception:
-            pass
-        # Try the directory itself
-        try:
-            nlp = spacy.load(path)
-            logger.info("spaCy loaded from: %s", path)
-            return nlp
-        except Exception as e:
-            logger.warning("spaCy load failed at %s: %s", path, e)
-
-    # Final fallback: try installed model name
+def _detect_pii_with_groq(text: str) -> list:
+    """Use Groq to detect PII strings in text. Returns list of strings."""
     try:
-        nlp = spacy.load("en_core_web_sm")
-        logger.info("spaCy loaded from installed model")
-        return nlp
+        from src.services.ai_classifier import _GROQ_API_KEY
+        if not _GROQ_API_KEY or _GROQ_API_KEY == "gsk_PASTE_YOUR_KEY_HERE":
+            return []
+        from groq import Groq
+        import json as _json
+        client = Groq(api_key=_GROQ_API_KEY)
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a privacy redaction assistant for Australian insurance documents. "
+                        "Find all personally identifiable information in the text. Return ONLY "
+                        "a JSON object with key 'pii_items' containing a list of exact strings to "
+                        "redact. Include: full names (2+ words), complete addresses, phone numbers, "
+                        "email addresses, policy numbers, claim numbers, job numbers, ABN/ACN numbers. "
+                        "Do NOT include company names like insurers or builders. Only personal client info."
+                    ),
+                },
+                {"role": "user", "content": f"Find all PII:\n\n{text[:3000]}"},
+            ],
+            response_format={"type": "json_object"},
+            timeout=10,
+        )
+        result = _json.loads(response.choices[0].message.content)
+        items = result.get("pii_items", [])
+        return [str(x).strip() for x in items if x and len(str(x).strip()) >= 2]
     except Exception as e:
-        logger.error("spaCy load failed entirely: %s", e)
-        return None
-
-
-_NLP = _load_spacy_model()
-_HAS_SPACY = _NLP is not None
+        logger.error("Groq PII detection failed: %s", e)
+        return []
 
 # ── Regex patterns for PII detection ──
 _RE_PHONE = re.compile(r'(\+?61[\s-]?)?(0\d[\s-]?)[\d\s-]{8,10}')
@@ -203,57 +171,43 @@ class DropZone(QFrame):
 
 
 class AutoRedactWorker(QThread):
-    """Background worker for auto-detecting PII in PDFs."""
-    progress = Signal(int, int)  # current_page, total_pages
-    page_done = Signal(int, list)  # page_num, list of RedactionBox
-    finished = Signal(dict)  # summary: {names, addresses, phones, refs, total}
+    """Background worker for auto-detecting PII in PDFs using regex + Groq."""
+    progress = Signal(int, int)
+    page_done = Signal(int, list)
+    finished = Signal(dict)  # {names, addresses, phones, refs, total, used_groq}
 
     def __init__(self, file_path: str, parent=None):
         super().__init__(parent)
         self._file_path = file_path
 
-    def _search_and_add(self, page, page_num, pii_text, boxes, seen_rects):
-        """Search for PII text on page and add non-overlapping boxes."""
+    def _search_and_add(self, page, page_num, pii_text, boxes, seen):
         try:
-            rects = page.search_for(pii_text.strip())
-            for r in rects:
+            for r in page.search_for(pii_text.strip()):
                 key = (page_num, round(r.x0, 1), round(r.y0, 1), round(r.x1, 1), round(r.y1, 1))
-                if key not in seen_rects:
-                    seen_rects.add(key)
-                    boxes.append(RedactionBox(
-                        page_num=page_num,
-                        pdf_rect=(r.x0, r.y0, r.x1, r.y1),
-                        type="AUTO",
-                        text=pii_text.strip(),
-                    ))
+                if key not in seen:
+                    seen.add(key)
+                    boxes.append(RedactionBox(page_num, (r.x0, r.y0, r.x1, r.y1), "AUTO", pii_text.strip()))
         except Exception:
             pass
 
     def run(self):
-        counts = {"names": 0, "addresses": 0, "phones": 0, "refs": 0, "total": 0}
+        counts = {"names": 0, "addresses": 0, "phones": 0, "refs": 0, "total": 0, "used_groq": False}
         try:
             doc = fitz.open(self._file_path)
-            total = len(doc)
-            for page_num in range(total):
-                self.progress.emit(page_num + 1, total)
+            total_pages = len(doc)
+            full_text_parts = []
+
+            for page_num in range(total_pages):
+                self.progress.emit(page_num + 1, total_pages)
                 page = doc[page_num]
                 text = page.get_text()
+                full_text_parts.append(text)
                 boxes = []
-                seen = set()  # dedup rects
+                seen = set()
 
-                # 1. spaCy PERSON entities (most reliable for names)
-                if _HAS_SPACY and _NLP:
-                    try:
-                        nlp_doc = _NLP(text)
-                        for ent in nlp_doc.ents:
-                            if ent.label_ == "PERSON" and len(ent.text.split()) >= 2:
-                                before = len(boxes)
-                                self._search_and_add(page, page_num, ent.text, boxes, seen)
-                                counts["names"] += len(boxes) - before
-                    except Exception:
-                        pass
+                # ── PASS 1: Regex (always runs, works offline) ──
 
-                # 2. Label-value pairs (Name: Craig Toohill, Address: ...)
+                # Label-value pairs
                 try:
                     for m in _RE_LABEL_VALUE.finditer(text):
                         value = m.group(1).strip()
@@ -264,7 +218,7 @@ class AutoRedactWorker(QThread):
                 except Exception:
                     pass
 
-                # 3. Full address pattern
+                # Full address
                 try:
                     for m in _RE_ADDRESS.finditer(text):
                         before = len(boxes)
@@ -273,7 +227,7 @@ class AutoRedactWorker(QThread):
                 except Exception:
                     pass
 
-                # 4. Street number pattern
+                # Street number
                 try:
                     for m in _RE_STREET.finditer(text):
                         before = len(boxes)
@@ -282,7 +236,7 @@ class AutoRedactWorker(QThread):
                 except Exception:
                     pass
 
-                # 5. Phone numbers
+                # Phone numbers
                 try:
                     for m in _RE_PHONE.finditer(text):
                         matched = m.group().strip()
@@ -293,7 +247,7 @@ class AutoRedactWorker(QThread):
                 except Exception:
                     pass
 
-                # 6. Policy/claim numbers
+                # Policy/claim numbers
                 try:
                     for m in _RE_POLICY.finditer(text):
                         before = len(boxes)
@@ -302,7 +256,7 @@ class AutoRedactWorker(QThread):
                 except Exception:
                     pass
 
-                # 7. Reference numbers near labels
+                # Reference numbers near labels
                 try:
                     for m in _RE_REF_LABEL.finditer(text):
                         ref = m.group(1).strip()
@@ -313,7 +267,7 @@ class AutoRedactWorker(QThread):
                 except Exception:
                     pass
 
-                # 8. Account numbers
+                # Account numbers
                 try:
                     for m in _RE_ACCOUNT.finditer(text):
                         before = len(boxes)
@@ -323,6 +277,27 @@ class AutoRedactWorker(QThread):
                     pass
 
                 self.page_done.emit(page_num, boxes)
+
+            # ── PASS 2: Groq AI name/PII detection (silent fail) ──
+            try:
+                full_text = "\n".join(full_text_parts)
+                groq_items = _detect_pii_with_groq(full_text)
+                if groq_items:
+                    counts["used_groq"] = True
+                    for pii_text in groq_items:
+                        for page_num in range(total_pages):
+                            page = doc[page_num]
+                            before_total = counts["names"]
+                            seen_g = set()
+                            self._search_and_add(page, page_num, pii_text, [], seen_g)
+                            for r in page.search_for(pii_text.strip()):
+                                key = (page_num, round(r.x0, 1), round(r.y0, 1), round(r.x1, 1), round(r.y1, 1))
+                                box = RedactionBox(page_num, (r.x0, r.y0, r.x1, r.y1), "AUTO", pii_text.strip())
+                                self.page_done.emit(page_num, [box])
+                                counts["names"] += 1
+            except Exception as e:
+                logger.debug("Groq PII pass failed: %s", e)
+
             doc.close()
         except Exception as e:
             logger.debug("Auto-redact error: %s", e)
@@ -478,12 +453,12 @@ class PrivacyTab(QWidget):
         root.setContentsMargins(8, 8, 8, 8)
         root.setSpacing(6)
 
-        # spaCy warning if missing
-        if not _HAS_SPACY:
-            warn = QLabel("spaCy not available — using regex-only PII detection. "
-                          "Install: pip install spacy && python -m spacy download en_core_web_sm")
+        # Groq availability warning
+        if not _groq_available():
+            warn = QLabel("AI name detection unavailable \u2014 regex only active. "
+                          "Use Draw Box to mark names manually.")
             warn.setWordWrap(True)
-            warn.setStyleSheet("padding: 6px; border: 1px solid #f38ba8; border-radius: 4px;")
+            warn.setStyleSheet("padding: 6px; border: 1px solid #f9e2af; border-radius: 4px;")
             root.addWidget(warn)
 
         # Top section: drop zone + file list
@@ -712,10 +687,12 @@ class PrivacyTab(QWidget):
 
         # Show summary
         total = counts.get("total", 0)
+        used_groq = counts.get("used_groq", False)
         if total > 0:
             parts = []
             if counts.get("names"):
-                parts.append(f"{counts['names']} names")
+                method = "AI+regex" if used_groq else "regex"
+                parts.append(f"{counts['names']} names/addresses ({method})")
             if counts.get("addresses"):
                 parts.append(f"{counts['addresses']} addresses")
             if counts.get("phones"):
@@ -724,39 +701,18 @@ class PrivacyTab(QWidget):
                 parts.append(f"{counts['refs']} reference numbers")
             self._summary_label.setText(f"Found {total} items to redact: {', '.join(parts)}")
             self._summary_label.setStyleSheet("padding: 6px; border: 1px solid #a6e3a1; border-radius: 4px;")
+        elif not used_groq:
+            self._summary_label.setText("No PII detected (regex only). Check manually for names.")
+            self._summary_label.setStyleSheet("padding: 6px; border: 1px solid #f9e2af; border-radius: 4px;")
         else:
             self._summary_label.setText("No PII detected automatically. Use Draw Box to manually mark sensitive areas.")
             self._summary_label.setStyleSheet("padding: 6px; border: 1px solid #f9e2af; border-radius: 4px;")
         self._summary_label.setVisible(True)
-        # Re-render to show boxes
+
+        # Re-render to show all boxes
         if self._current_file:
             self._render_file(self._current_file)
             self._update_redactions_panel()
-        # Groq second pass
-        try:
-            from src.services.ai_redactor import groq_redactor
-            from src.services.ai_classifier import groq_classifier
-            if groq_classifier.is_available() and self._current_file:
-                doc = fitz.open(self._current_file)
-                lines = []
-                for page in doc:
-                    lines.extend(page.get_text().splitlines())
-                doc.close()
-                missed = groq_redactor.redact_pass(lines)
-                if missed:
-                    doc2 = fitz.open(self._current_file)
-                    for pii_text in missed:
-                        for page_num in range(len(doc2)):
-                            rects = doc2[page_num].search_for(pii_text)
-                            for r in rects:
-                                self._redactions.setdefault(self._current_file, []).append(
-                                    RedactionBox(page_num, (r.x0, r.y0, r.x1, r.y1), "AUTO", pii_text)
-                                )
-                    doc2.close()
-                    self._render_file(self._current_file)
-                    self._update_redactions_panel()
-        except Exception:
-            pass
 
     def _toggle_draw(self, checked: bool):
         self._draw_mode = checked
