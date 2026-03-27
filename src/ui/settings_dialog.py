@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget,
     QLabel, QLineEdit, QTextEdit, QPushButton, QSpinBox,
     QCheckBox, QComboBox, QGroupBox, QFormLayout, QMessageBox,
+    QTableWidget, QTableWidgetItem, QHeaderView,
 )
 
 from src.core.settings import Settings
@@ -133,11 +134,79 @@ class SettingsDialog(QDialog):
         ai_form.addRow("Status:", status_label)
         ai_form.addRow("Model:", QLabel("llama-3.1-8b-instant"))
         ai_form.addRow("Limit:", QLabel("14,400 classifications per day (shared across all users)"))
-        ai_form.addRow("Trigger:", QLabel("Only called when confidence < 75%"))
+        ai_form.addRow("Trigger:", QLabel("Only called when confidence < 85%"))
         ai_form.addRow("Fallback:", QLabel("Fully offline rule-based classification"))
         ai_layout.addLayout(ai_form)
         ai_layout.addStretch()
         tabs.addTab(ai_tab, "AI Classification")
+
+        # Corrections History tab (read-only)
+        corr_tab = QWidget()
+        corr_layout = QVBoxLayout(corr_tab)
+
+        try:
+            from src.services.corrections_store import (
+                get_corrections_count, get_corrections_list,
+                get_last_sync_time, get_last_harvest_time,
+            )
+            corr_count = get_corrections_count()
+            corr_list = get_corrections_list()
+            last_sync = get_last_sync_time()
+            last_harvest = get_last_harvest_time()
+        except Exception:
+            corr_count = 0
+            corr_list = []
+            last_sync = "Never"
+            last_harvest = "Never"
+
+        corr_layout.addWidget(QLabel(f"Total corrections logged: {corr_count}"))
+
+        # Sync/harvest info
+        sync_form = QFormLayout()
+        sync_form.addRow("Sync method:", QLabel("GitHub (corrections-sync branch)"))
+        sync_form.addRow("Last sync:", QLabel(last_sync))
+        sync_form.addRow("Last harvest:", QLabel(last_harvest))
+        corr_layout.addLayout(sync_form)
+
+        # Corrections table
+        corr_table = QTableWidget(0, 5)
+        corr_table.setHorizontalHeaderLabels([
+            "Date", "Filename", "Field", "Was", "Corrected To"
+        ])
+        corr_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        corr_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        corr_table.setAlternatingRowColors(True)
+
+        # Show most recent 50 corrections
+        recent = list(reversed(corr_list[-50:]))
+        corr_table.setRowCount(len(recent))
+        for i, c in enumerate(recent):
+            ts = c.get("timestamp", "")[:19]
+            fn = c.get("original_filename", "")
+            fields = c.get("fields_corrected", [])
+            ai = c.get("ai_result", {})
+            corrected = c.get("corrected_result", {})
+            field_str = ", ".join(fields)
+            was_str = ", ".join(str(ai.get(f, "")) for f in fields)
+            now_str = ", ".join(str(corrected.get(f, "")) for f in fields)
+            corr_table.setItem(i, 0, QTableWidgetItem(ts))
+            corr_table.setItem(i, 1, QTableWidgetItem(fn))
+            corr_table.setItem(i, 2, QTableWidgetItem(field_str))
+            corr_table.setItem(i, 3, QTableWidgetItem(was_str))
+            corr_table.setItem(i, 4, QTableWidgetItem(now_str))
+
+        corr_layout.addWidget(corr_table, 1)
+
+        corr_layout.addWidget(QLabel(
+            "Every correction you make teaches the app to get it right next time.\n"
+            "Corrections sync to GitHub automatically."
+        ))
+        corr_layout.addWidget(QLabel(
+            "Admin: Run harvest_corrections.py periodically to push\n"
+            "improvements to GitHub so all future installs benefit."
+        ))
+
+        tabs.addTab(corr_tab, "Corrections History")
 
         layout.addWidget(tabs)
 

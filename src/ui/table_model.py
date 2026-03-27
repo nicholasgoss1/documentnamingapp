@@ -1,12 +1,18 @@
 """
 Qt table model for the document records.
+Logs corrections to corrections_store when users edit fields.
 """
+import logging
 from typing import List, Any, Optional
 
-from PySide6.QtCore import Qt, QAbstractTableModel, QModelIndex
+from PySide6.QtCore import Qt, QAbstractTableModel, QModelIndex, Signal
 from PySide6.QtGui import QColor
 
 from src.core.models import DocumentRecord, RenameStatus, DuplicateStatus
+
+logger = logging.getLogger(__name__)
+
+_COL_TO_FIELD = {1: "who", 2: "date", 3: "entity", 4: "what"}
 
 COLUMNS = [
     "Original Filename",
@@ -37,6 +43,8 @@ def _rebuild_filename(rec: DocumentRecord):
 
 class DocumentTableModel(QAbstractTableModel):
     """Table model backed by a list of DocumentRecords."""
+
+    correction_logged = Signal()  # emitted after a correction is saved
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -139,6 +147,18 @@ class DocumentTableModel(QAbstractTableModel):
         rec = self._records[row]
         value = str(value).strip()
 
+        # Capture before values for correction logging
+        field_name = _COL_TO_FIELD.get(col, "")
+        old_value = ""
+        if col == 1:
+            old_value = rec.who
+        elif col == 2:
+            old_value = rec.date
+        elif col == 3:
+            old_value = rec.entity
+        elif col == 4:
+            old_value = rec.what
+
         if col == 1:
             rec.who = value
         elif col == 2:
@@ -149,6 +169,29 @@ class DocumentTableModel(QAbstractTableModel):
             rec.what = value
         else:
             return False
+
+        # Log correction if value actually changed
+        if field_name and value != old_value:
+            try:
+                from src.services.corrections_store import log_correction
+                log_correction(
+                    original_filename=rec.original_filename,
+                    text_snippet=rec.extracted_text[:200] if rec.extracted_text else "",
+                    ai_result={
+                        "who": rec.who if col != 1 else old_value,
+                        "entity": rec.entity if col != 3 else old_value,
+                        "date": rec.date if col != 2 else old_value,
+                        "what": rec.what if col != 4 else old_value,
+                    },
+                    corrected_result={
+                        "who": rec.who, "entity": rec.entity,
+                        "date": rec.date, "what": rec.what,
+                    },
+                    fields_corrected=[field_name],
+                )
+                self.correction_logged.emit()
+            except Exception as e:
+                logger.debug("Failed to log correction: %s", e)
 
         # Manual edit overrides duplicate detection — rebuild from fields
         rec.duplicate_status = DuplicateStatus.NONE

@@ -14,3 +14,7 @@ tests/test_pdfs/
 .vscode/
 .groq_key
 .env
+Groq API key.txt
+**/Groq API key.txt
+GitHub sync token.txt
+**/GitHub sync token.txt

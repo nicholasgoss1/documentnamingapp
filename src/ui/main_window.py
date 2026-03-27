@@ -6,6 +6,7 @@ Main application window with three-tab interface:
 """
 import os
 import logging
+import threading
 from typing import List
 
 from PySide6.QtCore import Qt, QModelIndex
@@ -70,7 +71,20 @@ class MainWindow(QMainWindow):
         self._ai_label.setCursor(Qt.PointingHandCursor)
         self._ai_label.mousePressEvent = lambda _: self._open_settings()
         self.statusBar().addPermanentWidget(self._ai_label)
+
+        self._corr_label = QLabel(self._corrections_text())
+        self._corr_label.setCursor(Qt.PointingHandCursor)
+        self._corr_label.mousePressEvent = lambda _: self._open_settings()
+        self.statusBar().addPermanentWidget(self._corr_label)
+
+        # Connect correction_logged signal to update count
+        self._model.correction_logged.connect(self._update_corrections_count)
+
         self.statusBar().showMessage("Ready. Drag and drop files to begin (PDF, TXT, DOCX).")
+
+        # Background startup tasks (delayed)
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(5000, self._run_startup_tasks)
 
     def _build_menubar(self):
         menubar = self.menuBar()
@@ -631,3 +645,44 @@ class MainWindow(QMainWindow):
     def _open_history(self):
         dlg = HistoryDialog(self)
         dlg.exec_()
+
+    # ── Corrections ──
+
+    @staticmethod
+    def _corrections_text() -> str:
+        try:
+            from src.services.corrections_store import get_corrections_count
+            return f"Corrections: {get_corrections_count()}"
+        except Exception:
+            return "Corrections: 0"
+
+    def _update_corrections_count(self):
+        self._corr_label.setText(self._corrections_text())
+
+    # ── Background startup tasks ──
+
+    def _run_startup_tasks(self):
+        """Run background startup tasks after UI is fully loaded."""
+        def _tasks():
+            # Ensure corrections-sync branch exists on GitHub
+            try:
+                from src.services.github_sync import github_sync
+                if github_sync.is_available():
+                    github_sync._ensure_branch_exists()
+            except Exception:
+                pass
+
+            # Auto-harvest (once per day, after 30s delay from startup)
+            import time
+            time.sleep(25)  # Total ~30s after the 5s QTimer delay
+            try:
+                from src.services.github_sync import github_sync
+                from src.services.auto_harvest import auto_harvester
+                if github_sync.is_available() and auto_harvester.should_run_today():
+                    auto_harvester.run_harvest()
+                    logger.debug("Auto-harvest completed")
+            except Exception as e:
+                logger.debug("Auto-harvest failed: %s", e)
+
+        thread = threading.Thread(target=_tasks, daemon=True)
+        thread.start()
