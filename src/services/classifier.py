@@ -157,15 +157,71 @@ def _find_entities_in_text(text: str, sorted_keys: list, search_map: dict) -> li
     return found
 
 
+def _extract_entity_from_filename(filename: str, settings: Settings) -> Tuple[str, int]:
+    """Attempt to extract entity from a ClaimsCo-convention filename.
+
+    Convention: [WHO] - [DATE] - [ENTITY] - [WHAT].pdf
+    The entity is the third segment (index 2) when split on ' - '.
+    Returns (entity, confidence) or ("", 0) if not extractable.
+    """
+    # Strip extension
+    name = filename
+    for ext in (".pdf", ".txt", ".docx"):
+        if name.lower().endswith(ext):
+            name = name[:-len(ext)]
+            break
+
+    segments = [s.strip() for s in name.split(" - ")]
+    if len(segments) < 3:
+        return "", 0
+
+    candidate = segments[2]
+    if not candidate:
+        return "", 0
+
+    # Reject if it looks like a date (DD.MM.YYYY)
+    if re.match(r'^\d{1,2}\.\d{1,2}\.\d{4}$', candidate):
+        return "", 0
+
+    # Reject known WHO values
+    who_values = {"ff", "complainant", "afca", "unknown", "internal document"}
+    if candidate.lower() in who_values:
+        return "", 0
+
+    # Reject known WHAT values (doc type labels from settings)
+    doc_labels = {l.lower() for l in settings.get("preferred_doc_labels", [])}
+    doc_keywords = {k.lower() for k in settings.get("doc_type_keywords", {}).keys()}
+    if candidate.lower() in doc_labels or candidate.lower() in doc_keywords:
+        return "", 0
+
+    # Resolve through aliases if possible
+    aliases = settings.get("entity_aliases", {})
+    for alias, canonical in aliases.items():
+        if candidate.lower() == alias.lower():
+            return canonical, 20
+
+    # Check preferred entities for case normalisation
+    for pref in settings.get("preferred_entities", []):
+        if candidate.lower() == pref.lower():
+            return pref, 20
+
+    # Use as-is (entity not in our lists but still valid from filename)
+    return candidate, 18
+
+
 def infer_entity(page1_text: str, full_text: str, filename: str,
                  settings: Settings, page1_regions: dict = None) -> Tuple[str, int]:
     """
     Infer the ENTITY field by looking for known entities.
-    Uses spatial layout when available: top-right region (letterhead/logo)
-    is the strongest signal for document authorship, followed by the
-    full header area.  The top-left region (addressee) is deprioritised.
+    First attempts extraction from the ClaimsCo filename convention,
+    then uses spatial layout, header text, and full text search.
     Returns (entity_string, confidence_contribution 0-20).
     """
+    # Phase -1: extract from filename convention [WHO] - [DATE] - [ENTITY] - [WHAT]
+    fn_entity, fn_conf = _extract_entity_from_filename(filename, settings)
+    if fn_entity:
+        return fn_entity, fn_conf
+
     preferred = settings.get("preferred_entities", [])
     aliases = settings.get("entity_aliases", {})
 

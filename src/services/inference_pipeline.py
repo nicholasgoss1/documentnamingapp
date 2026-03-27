@@ -292,11 +292,13 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
     record.confidence = record.confidence_breakdown.total()
 
     # ── Groq AI classification for low-confidence documents ──────────
-    if record.confidence < 75:
+    if record.confidence < 85:
         try:
             from src.services.ai_classifier import groq_classifier
             if groq_classifier.is_available():
-                ai_result = groq_classifier.classify_document(record.extracted_text)
+                ai_result = groq_classifier.classify_document(
+                    record.extracted_text, filename=record.original_filename
+                )
                 if ai_result:
                     # Override fields with AI results, running through normalizers
                     if ai_result.get("who"):

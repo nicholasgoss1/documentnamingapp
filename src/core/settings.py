@@ -249,7 +249,28 @@ DEFAULT_SETTINGS = {
         "impartaengineers": "Imparta Engineers",
         "Melrose Building": "Melrose Building Projects",
         "Melrose Building Projects Pty Ltd": "Melrose Building Projects",
-        "Melrose Building Projects Pty": "Melrose Building Projects"
+        "Melrose Building Projects Pty": "Melrose Building Projects",
+        "Solarez Energy": "Solarez",
+        "Solarez Energy Pty Ltd": "Solarez",
+        "PV Lab": "PV Lab Australia",
+        "PV Lab Pty Ltd": "PV Lab Australia",
+        "BMG": "BMG Engineering",
+        "BMG Engineering Pty Ltd": "BMG Engineering",
+        "Ezy Projects": "Ezy Projects",
+        "EZ Projects": "Ezy Projects",
+        "Ambrose Construct": "Ambrose Construct Group",
+        "Ambrose Construct Group Pty Ltd": "Ambrose Construct Group",
+        "Ambrose Construction": "Ambrose Construct Group",
+        "Kehoe Myers Pty Ltd": "Kehoe Myers",
+        "InTouch Projects": "InTouch Projects",
+        "ITP": "InTouch Projects",
+        "In Touch Projects": "InTouch Projects",
+        "Early Warning Network": "Early Warning Network",
+        "EWN": "Early Warning Network",
+        "Vero Insurance": "Vero",
+        "Vero Insurance Limited": "Vero",
+        "Woolworths Insurance": "Woolworths Insurance",
+        "RAA Insurance": "RAA",
     },
     "preferred_entities": [
         "ClaimsCo", "Campbell Constructions", "Sedgwick",
@@ -260,9 +281,24 @@ DEFAULT_SETTINGS = {
         "Live Electrical", "Aizer Insurance Builders", "Salt Water Roofing",
         "Imparta Engineers", "AJ Grant",
         "AFCA",
-        "ACB", "AusCoast", "RUCA", "Balmoral", "Patcol",
+        "ACB", "AusCoast", "AusCoast Builders", "RUCA", "Balmoral", "Patcol",
         "Melrose Building Projects",
-        "WeatherWatch", "BoM", "COI"
+        "WeatherWatch", "BoM", "COI",
+        # Insurers
+        "Allianz", "Suncorp", "RACQ", "IAG", "NRMA",
+        "Budget Direct", "Youi", "Coles Insurance", "Woolworths Insurance",
+        "RAA", "SGIC", "AAMI", "GIO", "Bingle", "Shannons",
+        "Vero", "Zurich", "AIG", "Chubb",
+        # Solar / Specialist
+        "Solarez", "Solarez Energy", "PV Lab", "PV Lab Australia",
+        # Builders / Engineers
+        "BMG Engineering", "BMG", "Ezy Projects", "EZ Projects",
+        "Ambrose", "Ambrose Construct", "Ambrose Construct Group",
+        "Kehoe Myers", "InTouch Projects", "ITP",
+        # Weather
+        "Early Warning Network", "EWN",
+        # Internal tokens
+        "DOA", "AAF",
     ],
     "preferred_doc_labels": [
         "Site Report", "Photo Schedule", "Assessment Report",

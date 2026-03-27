@@ -12,3 +12,5 @@ tests/test_pdfs/
 *.spec.bak
 .idea/
 .vscode/
+.groq_key
+.env
