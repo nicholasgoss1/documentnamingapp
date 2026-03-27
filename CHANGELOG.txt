@@ -1,0 +1,295 @@
+================================================================================
+  Claim File Renamer - Change Log
+================================================================================
+
+
+v1.6.0 - 23 Mar 2026
+---------------------
+ADDED
+- New entity: Live Electrical (aliases: Live Electrical & Air Conditioning,
+  Live Services Group, liveg.com.au)
+- New entity: Aizer Insurance Builders (aliases: Aizer Insurance, Aizer Group)
+- New entity: Salt Water Roofing (alias: Saltwater Roofing)
+- New document type: Solar PV Specialist Report
+- Conflict rule: Solar PV Specialist Report wins over Quote when both match
+
+
+v1.5.9 - 23 Mar 2026
+---------------------
+CHANGED
+- Removed "UNSURE" suffix from proposed filenames. Low-confidence files are
+  still flagged internally but no longer have UNSURE appended to the filename.
+
+
+v1.5.8 - 23 Mar 2026
+---------------------
+ADDED
+- New "Final Report" document type for loss adjuster final reports (e.g.
+  Sedgwick Final Report). Previously these were misclassified as Claims Team
+  FDL because "claim decision" appeared in the report text.
+
+FIXED
+- Sedgwick Final Reports no longer misclassified as Claims Team FDL. Added
+  conflict resolution: Claims Team FDL loses to Final Report when both match.
+- ClaimsCo-authored Notice of Response to AFCA now correctly identified:
+  WHO=Complainant, ENTITY=ClaimsCo, WHAT="Notice of Response". Previously
+  showed as FF / Notice of Response from QBE because QBE was mentioned in text.
+- Added "the financial firm's" as ClaimsCo authorship detection phrase (used
+  in complainant-side AFCA submissions referring to the insurer in third person).
+- "Information Request Response" documents now classified as Request for
+  Information instead of PDS.
+- Date engine now skips "Date of Loss", "Date of Incident" and similar event
+  date labels when inferring document dates for letters and reports. Prevents
+  picking up the loss date (e.g. 24.12.2023) instead of the actual letter date.
+- Date engine rejects pre-2000 dates for letter/report types and scans deeper
+  into the document for the correct date (e.g. Morse Building report now picks
+  up 26.07.2024 from page 2 instead of 07.12.1969 construction date).
+- AFCA-authored documents now always show ENTITY=AFCA.
+- Certificate of Insurance no longer overrides IDR FDL, Notice of Response,
+  or Request for Information classifications.
+- Delegation of Authority no longer overrides AFCA Submission classification.
+- Added "complaint lodgement" and "lodgement of a formal complaint" keywords
+  for AFCA Submission detection.
+
+
+v1.5.7 - 19 Mar 2026
+---------------------
+FIXED
+- Duplicate detection now catches more cases:
+  - Field-based comparison now includes already-flagged records so a file
+    with the same WHO+DATE+ENTITY+WHAT as an exact duplicate also gets caught
+    (previously, exact duplicates were excluded from field comparison, allowing
+    a third copy with different binary content to slip through unflagged).
+  - One-per-claim document type checks similarly improved.
+  - Rows whose fields literally contain "DUPLICATE" (from previous rename
+    sessions) are now automatically flagged as Likely Duplicate.
+
+
+v1.5.6 - 19 Mar 2026
+---------------------
+FIXED
+- Rename validation no longer blocks on duplicate target filenames. When
+  multiple approved files produce the same proposed name, the app now
+  automatically appends (2), (3), etc. to resolve collisions instead of
+  showing a "Duplicate target name" error.
+
+
+v1.5.5 - 19 Mar 2026
+---------------------
+CHANGED
+- Hidden the Confidence Reason column from the table to reduce visual clutter.
+  Confidence score column remains visible.
+
+
+v1.5.4 - 19 Mar 2026
+---------------------
+FIXED
+- Manually editing a field (WHO, DATE, ENTITY, WHAT) on a duplicate-flagged
+  row now correctly rebuilds the proposed filename from the edited values.
+  Previously the filename stayed as "DUPLICATE.pdf" even after editing because
+  the duplicate status was never cleared on manual edits. This also caused
+  validation errors ("Duplicate target name") when trying to rename.
+- Same fix applied to bulk field edits (Set WHO/Entity/WHAT/Date buttons)
+  and Find/Replace operations.
+
+
+v1.5.3 - 18 Mar 2026
+---------------------
+FIXED
+- Root cause fix for entity detection: added Unicode NFKC normalisation to
+  decompose PDF ligature characters (ﬁ→fi, ﬂ→fl, ﬀ→ff, etc.). PDFs
+  frequently encode "fi" as the single ligature glyph U+FB01, causing
+  "Certified" to be stored as "Certi\uFB01ed" which silently broke all
+  substring matching against entity names. NFKC normalisation decomposes
+  these back to standard characters.
+- Changed PyMuPDF text extraction flags to clear TEXT_PRESERVE_LIGATURES,
+  so ligatures are decomposed at extraction time as well (defence in depth).
+- Added word-level text extraction fallback: if standard text extraction
+  and deep scan both fail to find an entity, a word-by-word extraction pass
+  captures text that may be missed due to unusual font encodings or PDF
+  structure.
+
+v1.5.2 - 18 Mar 2026
+---------------------
+FIXED
+- PDF text cleaning now strips non-breaking spaces (U+00A0), zero-width
+  spaces, BOM characters, and other invisible Unicode that some PDFs embed
+  between words. These were preventing entity name matching even after
+  whitespace normalization. Non-breaking spaces are replaced with regular
+  spaces (not deleted) to preserve word boundaries.
+- Added shorter entity alias "Certified Building Inspection" (4 words) as
+  fallback — less vulnerable to text extraction splitting across 5 words.
+  Also added full URL form "www.certifiedbuildinginspection.com.au".
+
+
+v1.5.1 - 18 Mar 2026
+---------------------
+FIXED
+- Entity detection now normalises whitespace before matching: PDF line breaks
+  within multi-word entity names (e.g. "Certified Building Inspection\nServices")
+  no longer prevent detection. This was the root cause of the Pre Purchase
+  Inspection Report entity being blank despite the name appearing on page 1.
+- TB32 Technical Bulletin now always shows ENTITY = BlueScope (forced override)
+- Added BlueScope as a recognised FF entity with aliases (BlueScope Steel,
+  BlueScope Steel Limited)
+
+
+v1.5.0 - 18 Mar 2026
+---------------------
+FIXED
+- Letter of Engagement now always shows ENTITY = ClaimsCo: forced entity
+  overrides moved AFTER the entity_include_rules check so they can never
+  be cleared by settings
+- Request for Information now reliably shows insurer entity (e.g. AAI):
+  settings migration ensures entity_include_rules is updated from old
+  saved settings
+- Entity detection now scans up to 30 pages (was 5) when no entity is
+  found in the first 10 pages, catching entities deeper in long documents
+
+IMPROVED
+- Added settings migration system: when the app upgrades, new doc types,
+  entities, aliases, and rule changes are automatically merged into the
+  user's saved settings.json without losing custom modifications
+- Increased default text extraction from 5 to 10 pages for better date,
+  keyword, and entity detection across longer documents
+
+
+v1.4.2 - 18 Mar 2026
+---------------------
+NEW
+- Added "Pre Purchase Inspection Report" document type (always Complainant)
+  with keywords (pre purchase inspection, pre-purchase building, etc.)
+
+FIXED
+- TB32 Technical Bulletin no longer misclassified as Hail Report: TB32 now
+  beats Hail Report in conflict resolution (TB32 bulletins discuss hail
+  damage but are reference documents)
+- Letter of Engagement now always shows ENTITY = ClaimsCo (was being cleared
+  by entity_include_rules set to False; changed to True)
+- Request for Information now shows insurer ENTITY (e.g. AAI for AAMI letters)
+  — entity_include_rules changed from False to True
+- Pre Purchase Inspection Reports correctly classified as Complainant, not FF
+
+
+v1.4.1 - 18 Mar 2026
+---------------------
+NEW
+- Added "Claims Team FDL" document type for insurer claim decision letters
+  (keywords: "allowing us to review your claim", "your policy does not cover",
+  "we are unable to accept your claim", etc.)
+- Added MCS Group as a recognised FF entity with aliases (Holdings Pty Ltd,
+  Independent National, etc.)
+- Added Certified Building Inspection Services as a recognised FF entity with
+  aliases (Certified Pest and Building, Certified Pest & Building, etc.)
+
+FIXED
+- AAMI claim decision letters no longer misclassified as PDS: Claims Team FDL
+  now beats PDS in conflict resolution (letters referencing the PDS are not a PDS)
+- PDS documents now correctly show insurer entity (e.g. AAI for AAMI PDS) via
+  the AAMI → AAI alias added in v1.4.0
+
+IMPROVED
+- Claims Team FDL treated as FF-side document with insurer entity detection
+
+
+v1.4.0 - 18 Mar 2026
+---------------------
+NEW
+- Added "TB32 Technical Bulletin" document type with keywords (tb-32, tb 32,
+  tb32, technical bulletin)
+- Added "Desktop Report" document type with keywords (desktop report, desktop
+  assessment, desktop review)
+- Added Tomkat Roofing as a recognised FF entity with aliases
+- Added AAMI → AAI entity alias (AAMI documents now show ENTITY = AAI)
+
+FIXED
+- Engagement Letter no longer misclassified as Delegation of Authority: removed
+  overly broad "doa" keyword, added "engagement" keyword for Letter of
+  Engagement, and added conflict resolution (Engagement beats DOA)
+- Roof reports from recognised roofing companies (e.g. Tomkat Roofing) now
+  correctly classified as WHO = FF instead of Complainant
+
+IMPROVED
+- Letter of Engagement beats Delegation of Authority in conflict resolution
+
+
+v1.3.1 - 18 Mar 2026
+---------------------
+NEW
+- Added Australian Building & Construction (ABC) as a recognised FF entity
+  with aliases (Group Pty Ltd, Group, and "and" variants)
+
+IMPROVED
+- Engineering Report now beats Quote in conflict resolution (engineering
+  reports containing pricing/cost info were being misclassified as Quotes)
+- Engineering Report added to date engine letter types so dates are searched
+  across all pages, not just page 1 (fixes missed dates on page 2 cover sheets)
+- Removed short "CES" alias to prevent false entity matches on words like
+  "processes"; full "Clear Engineering Services" and URL form still matched
+
+
+v1.3.0 - 17 Mar 2026
+---------------------
+NEW
+- Added "Engineering Report" document type with keywords (engineering report,
+  engineering assessment, engineering response, engineers report, etc.)
+- Added Clear Engineering Services (CES) as a recognised FF entity with aliases
+- Added RACQ Insurance to preferred entities for reliable detection
+- Added ClaimsCo logo to top-right of main window header
+
+IMPROVED
+- IDR FDL now always wins over Information Sheet when IDR keywords are present
+  (insurer complaint decision letters were being misclassified as Info Sheets)
+- Insurer authorship phrase detection: first-person insurer language
+  ("we have reviewed your complaint", "our final decision", etc.) now correctly
+  identifies documents as FF even without letterhead
+- Entity detection for IDR FDL letters without letterhead: when entity is a
+  complainant entity but document is insurer-authored, re-searches for FF entity
+- Engineering reports are always classified as FF-side documents
+- Page navigation up/down arrows replaced with larger buttons for easier clicking
+
+
+v1.2.0 - 14 Mar 2026
+---------------------
+FIXED
+- ClaimsCo-to-AFCA letters (e.g. AFCA Re-Lodgement) no longer misclassified
+  as Hail Report; correctly identified as ClaimsCo Letter to IDR
+- Two-digit year dates (e.g. 25.02.26) now parsed correctly
+
+
+v1.1.0 - 12 Mar 2026
+---------------------
+FIXED
+- File handle leaks causing rename errors on Windows
+- Quote amount extraction now finds the grand total, not the first dollar amount
+- Installer now prompts to uninstall previous version before installing
+- DUPLICATE files are now actually renamed on disk instead of being skipped
+
+IMPROVED
+- IDR FDL documents now include insurer name as ENTITY
+- Renamed AAF to Agent Authority Form; set fixed entities for DOA and AAF
+- Added Information Sheet document type; removed overly broad "complaint"
+  keyword from IDR detection
+- Multiple classification rule fixes for various document types
+
+
+v1.0.0 - 08 Mar 2026
+---------------------
+NEW
+- Initial release of Claim File Renamer
+- Drag-and-drop PDF processing with automatic field inference
+  (WHO, ENTITY, WHAT, DATE)
+- Spatial layout analysis for letter-format author detection
+- 150+ insurer entities recognised (general, life, health, white-label brands)
+- ClaimsCo authorship detection (text phrases + image-logo fallback)
+- AFCA document detection (RFI, Preliminary Assessment)
+- Duplicate detection and name collision resolution
+- PDF preview with page navigation
+- Bulk operations: Set Entity, Set WHAT, Set Date, NO DATE, Find/Replace,
+  Lock Selected, Remove Selected
+- Approve Selected / Approve All / Rename Approved workflow
+- Undo Last Batch support
+- Export to CSV
+- Dark mode / light mode toggle
+- Settings dialog for customising keywords, entities, and thresholds
+- Windows installer (Inno Setup)

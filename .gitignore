@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+dist/
+build/
+*.egg-info/
+installer_output/*
+!installer_output/.gitkeep
+tests/test_pdfs/
+*.spec.bak
+.idea/
+.vscode/
