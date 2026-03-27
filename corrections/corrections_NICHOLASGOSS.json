@@ -20,6 +20,26 @@
       "fields_corrected": [
         "entity"
       ]
+    },
+    {
+      "timestamp": "2026-03-28T08:36:57.913636",
+      "original_filename": "TB 32 - Impact of hail damage Jan 2021.pdf",
+      "text_snippet": "Introduction \nThis Technical Bulletin provides a general description of the typical effects of hail stones on exterior BlueScope coated steel products \nincluding COLORBOND® prepainted steel, SUPERDURA",
+      "ai_result": {
+        "who": "FF",
+        "entity": "Allianz",
+        "date": "NO DATE",
+        "what": "Hail Report"
+      },
+      "corrected_result": {
+        "who": "FF",
+        "entity": "Allianz",
+        "date": "NO DATE",
+        "what": "TB32"
+      },
+      "fields_corrected": [
+        "what"
+      ]
     }
   ]
 }
