@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-# PyInstaller spec file for Claim File Renamer
+# PyInstaller spec file for ClaimsCo Document Tools
 
 import sys
 import os
@@ -7,17 +7,57 @@ import os
 block_cipher = None
 
 a = Analysis(
-    ['main.py'],
+    ['ClaimsCo_Tools.py'],   # entry point — the combined 3-tab app
     pathex=[],
     binaries=[],
     datas=[
         ('assets', 'assets'),
+        ('src', 'src'),
     ],
     hiddenimports=[
+        # Qt
         'PySide6.QtCore',
         'PySide6.QtGui',
         'PySide6.QtWidgets',
+        'PySide6.QtSvgWidgets',
+        # PDF libraries
         'fitz',
+        'pdfplumber',
+        'pdfminer',
+        'pdfminer.high_level',
+        'pdfminer.layout',
+        'pdfminer.pdfpage',
+        'pdfminer.converter',
+        'pdfminer.pdfinterp',
+        # OCR / image
+        'pytesseract',
+        'pdf2image',
+        'PIL',
+        'PIL.Image',
+        'PIL.ImageDraw',
+        # src package
+        'src',
+        'src.core',
+        'src.core.settings',
+        'src.core.models',
+        'src.services',
+        'src.services.classifier',
+        'src.services.confidence',
+        'src.services.date_engine',
+        'src.services.duplicate_detector',
+        'src.services.inference_pipeline',
+        'src.services.normalizer',
+        'src.services.pdf_extractor',
+        'src.services.rename_service',
+        'src.ui',
+        'src.ui.filter_proxy',
+        'src.ui.history_dialog',
+        'src.ui.main_window',
+        'src.ui.preview_widget',
+        'src.ui.settings_dialog',
+        'src.ui.table_model',
+        'src.ui.theme',
+        'src.ui.worker',
     ],
     hookspath=[],
     hooksconfig={},
@@ -39,7 +79,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='ClaimFileRenamer',
+    name='ClaimsCo_Tools',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -61,5 +101,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='ClaimFileRenamer',
+    name='ClaimsCo_Tools',
 )

@@ -1,17 +1,17 @@
-; Inno Setup Script for Claim File Renamer
+; Inno Setup Script for ClaimsCo Document Tools
 ; Download Inno Setup from https://jrsoftware.org/isdl.php
 
 [Setup]
 AppId={{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}
-AppName=Claim File Renamer
-AppVersion=1.2.0
-AppVerName=Claim File Renamer 1.2.0
-AppPublisher=ClaimFileRenamer
-DefaultDirName={autopf}\ClaimFileRenamer
-DefaultGroupName=Claim File Renamer
+AppName=ClaimsCo Document Tools
+AppVersion=2.0.0
+AppVerName=ClaimsCo Document Tools 2.0.0
+AppPublisher=ClaimsCo Pty Ltd
+DefaultDirName={autopf}\ClaimsCo_Tools
+DefaultGroupName=ClaimsCo Document Tools
 DisableProgramGroupPage=yes
 OutputDir=..\installer_output
-OutputBaseFilename=ClaimFileRenamer_Setup_1.2.0
+OutputBaseFilename=ClaimsCo_Tools_Setup_2.0.0
 SetupIconFile=..\assets\icon.ico
 Compression=lzma
 SolidCompression=yes
@@ -27,15 +27,15 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "..\dist\ClaimFileRenamer\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\ClaimsCo_Tools\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\Claim File Renamer"; Filename: "{app}\ClaimFileRenamer.exe"
-Name: "{group}\{cm:UninstallProgram,Claim File Renamer}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\Claim File Renamer"; Filename: "{app}\ClaimFileRenamer.exe"; Tasks: desktopicon
+Name: "{group}\ClaimsCo Document Tools"; Filename: "{app}\ClaimsCo_Tools.exe"
+Name: "{group}\{cm:UninstallProgram,ClaimsCo Document Tools}"; Filename: "{uninstallexe}"
+Name: "{autodesktop}\ClaimsCo Document Tools"; Filename: "{app}\ClaimsCo_Tools.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\ClaimFileRenamer.exe"; Description: "{cm:LaunchProgram,Claim File Renamer}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\ClaimsCo_Tools.exe"; Description: "{cm:LaunchProgram,ClaimsCo Document Tools}"; Flags: nowait postinstall skipifsilent
 
 [Code]
 function GetUninstallString(): String;
@@ -75,7 +75,7 @@ begin
   if UninstallString <> '' then
   begin
     InstalledVersion := GetInstalledVersion();
-    if MsgBox('Claim File Renamer version ' + InstalledVersion + ' is already installed.' + #13#10 + #13#10 +
+    if MsgBox('ClaimsCo Document Tools version ' + InstalledVersion + ' is already installed.' + #13#10 + #13#10 +
               'The previous version must be uninstalled before installing this version.' + #13#10 + #13#10 +
               'Would you like to uninstall it now?',
               mbConfirmation, MB_YESNO) = IDYES then

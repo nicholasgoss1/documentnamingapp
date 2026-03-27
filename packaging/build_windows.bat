@@ -6,7 +6,7 @@ REM Ensure working directory is the project root (parent of packaging\)
 cd /d "%~dp0.."
 
 echo ============================================
-echo  Claim File Renamer - Build Script
+echo  ClaimsCo Document Tools - Build Script
 echo ============================================
 echo Working directory: %CD%
 echo.
@@ -27,8 +27,8 @@ pyinstaller build.spec --clean --noconfirm
 echo.
 echo ============================================
 echo  Build complete!
-echo  Output: dist\ClaimFileRenamer\
-echo  Run:    dist\ClaimFileRenamer\ClaimFileRenamer.exe
+echo  Output: dist\ClaimsCo_Tools\
+echo  Run:    dist\ClaimsCo_Tools\ClaimsCo_Tools.exe
 echo ============================================
 echo.
 
@@ -49,7 +49,7 @@ if defined ISCC_PATH (
     echo [4/4] Building installer with Inno Setup...
     "%ISCC_PATH%" packaging\installer.iss
     echo.
-    echo Installer created: installer_output\ClaimFileRenamer_Setup_1.2.0.exe
+    echo Installer created: installer_output\ClaimsCo_Tools_Setup_2.0.0.exe
 ) else (
     echo [4/4] Inno Setup not found. Skipping installer creation.
     echo       Install Inno Setup from https://jrsoftware.org/isdl.php
