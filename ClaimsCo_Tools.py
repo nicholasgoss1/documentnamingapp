@@ -84,6 +84,23 @@ except ImportError:
 # File types the extractor handles
 SUPPORTED_EXTENSIONS = (".pdf", ".txt", ".docx")
 
+
+def _read_file_text(path: str) -> str:
+    """Read the full text of a .txt or .docx file (for redaction/preview)."""
+    ext = os.path.splitext(path)[1].lower()
+    if ext == ".txt":
+        for enc in ("utf-8", "utf-8-sig", "cp1252", "latin-1"):
+            try:
+                with open(path, "r", encoding=enc) as f:
+                    return f.read()
+            except (UnicodeDecodeError, LookupError):
+                continue
+        return ""
+    if ext == ".docx" and _HAS_DOCX:
+        doc = DocxDocument(path)
+        return "\n".join(p.text for p in doc.paragraphs)
+    return ""
+
 # ══════════════════════════════════════════════════════════════════════════════
 # REDACTION PATTERNS
 # Each entry: key -> (regex_pattern, human_label)
@@ -329,15 +346,35 @@ class PreviewWorker(QThread):
         self.custom_terms = custom_terms  # [str, ...]
 
     def run(self):
-        if not _HAS_FITZ:
-            self.log_line.emit("ERROR: PyMuPDF is not installed. Run: pip install PyMuPDF")
-            self.finished.emit(0, 0)
-            return
-
         total  = 0
         pages  = 0
         for filename in self.files:
             path = os.path.join(self.folder, filename)
+            ext  = os.path.splitext(filename)[1].lower()
+
+            # ── Text-based files (.txt, .docx): regex counting ────────────
+            if ext in (".txt", ".docx"):
+                try:
+                    text = _read_file_text(path)
+                except Exception as e:
+                    self.log_line.emit(f"ERROR reading {filename}: {e}")
+                    continue
+                pages += 1
+                for _key, (pattern, _label) in self.patterns.items():
+                    try:
+                        total += len(re.findall(pattern, text))
+                    except Exception:
+                        pass
+                for term in self.custom_terms:
+                    if term.strip():
+                        total += text.count(term.strip())
+                continue
+
+            # ── PDF files: use PyMuPDF ────────────────────────────────────
+            if not _HAS_FITZ:
+                self.log_line.emit("ERROR: PyMuPDF is not installed. Run: pip install PyMuPDF")
+                self.finished.emit(0, 0)
+                return
             try:
                 doc = fitz.open(path)
                 for page in doc:
@@ -362,9 +399,9 @@ class PreviewWorker(QThread):
 
 class RedactionWorker(QThread):
     """
-    Redacts selected PDFs using PyMuPDF native redaction annotations.
-    Each matched area is permanently removed from the text layer (not just
-    painted over) via page.apply_redactions().
+    Redacts selected documents (PDF, TXT, DOCX).
+    - PDF: PyMuPDF native redaction annotations (text layer removal).
+    - TXT/DOCX: regex-based find-and-replace with [REDACTED].
     Saves output to [folder]/Redacted/ — originals are never modified.
     """
     progress = Signal(int, int)   # (current, total)
@@ -380,13 +417,85 @@ class RedactionWorker(QThread):
         self.custom_terms  = custom_terms
         self.add_watermark = add_watermark
 
-    def run(self):
-        if not _HAS_FITZ:
-            self.log_line.emit(
-                "ERROR: PyMuPDF is not installed. Run: pip install PyMuPDF")
-            self.finished.emit({"total": 0, "success": 0, "failed": 0})
-            return
+    # ── Text-based redaction (TXT / DOCX) ─────────────────────────────────
 
+    def _redact_txt(self, src: str, dst: str):
+        """Redact a plain-text file via regex replacement."""
+        text = _read_file_text(src)
+        total_redactions = 0
+        categories_used  = set()
+
+        for _key, (pattern, label) in self.patterns.items():
+            try:
+                text, n = re.subn(pattern, "[REDACTED]", text)
+                total_redactions += n
+                if n:
+                    categories_used.add(label)
+            except Exception as err:
+                self.log_line.emit(f"  Warning [{label}]: {err}")
+
+        for term in self.custom_terms:
+            if not term.strip():
+                continue
+            count = text.count(term.strip())
+            if count:
+                text = text.replace(term.strip(), "[REDACTED]")
+                total_redactions += count
+                categories_used.add("Custom Terms")
+
+        if self.add_watermark:
+            text += "\n\nREDACTED — ClaimsCo\n"
+
+        with open(dst, "w", encoding="utf-8") as f:
+            f.write(text)
+        return total_redactions, categories_used
+
+    def _redact_docx(self, src: str, dst: str):
+        """Redact a Word document via paragraph-level regex replacement."""
+        if not _HAS_DOCX:
+            raise RuntimeError("python-docx is not installed. Run: pip install python-docx")
+
+        doc = DocxDocument(src)
+        total_redactions = 0
+        categories_used  = set()
+
+        for para in doc.paragraphs:
+            original = para.text
+            text = original
+
+            for _key, (pattern, label) in self.patterns.items():
+                try:
+                    text, n = re.subn(pattern, "[REDACTED]", text)
+                    total_redactions += n
+                    if n:
+                        categories_used.add(label)
+                except Exception as err:
+                    self.log_line.emit(f"  Warning [{label}]: {err}")
+
+            for term in self.custom_terms:
+                if not term.strip():
+                    continue
+                count = text.count(term.strip())
+                if count:
+                    text = text.replace(term.strip(), "[REDACTED]")
+                    total_redactions += count
+                    categories_used.add("Custom Terms")
+
+            # Update paragraph runs if text changed
+            if text != original:
+                for run in para.runs:
+                    run.text = ""
+                if para.runs:
+                    para.runs[0].text = text
+                else:
+                    para.text = text
+
+        doc.save(dst)
+        return total_redactions, categories_used
+
+    # ── Main worker loop ──────────────────────────────────────────────────
+
+    def run(self):
         output_dir = os.path.join(self.folder, "Redacted")
         try:
             os.makedirs(output_dir, exist_ok=True)
@@ -404,69 +513,84 @@ class RedactionWorker(QThread):
             self.progress.emit(i + 1, total)
             src  = os.path.join(self.folder, filename)
             dst  = os.path.join(output_dir, filename)
+            ext  = os.path.splitext(filename)[1].lower()
             self.log_line.emit(f"\nProcessing: {filename}")
 
             try:
-                doc              = fitz.open(src)
-                total_redactions = 0
-                categories_used  = set()
-                pages_processed  = len(doc)
+                # ── TXT ───────────────────────────────────────────────────
+                if ext == ".txt":
+                    total_redactions, categories_used = self._redact_txt(src, dst)
+                    pages_processed = 1
 
-                for page in doc:
-                    # ── Step 1: add redaction annotations ────────────────────
-                    for _key, (pattern, label) in self.patterns.items():
-                        try:
-                            rects = find_pattern_rects(page, pattern)
-                            for rect in rects:
-                                page.add_redact_annot(rect, fill=(0, 0, 0))
-                                total_redactions += 1
-                                categories_used.add(label)
-                        except Exception as err:
-                            self.log_line.emit(
-                                f"  Warning [{label}]: {err}")
+                # ── DOCX ──────────────────────────────────────────────────
+                elif ext == ".docx":
+                    total_redactions, categories_used = self._redact_docx(src, dst)
+                    pages_processed = 1
 
-                    for term in self.custom_terms:
-                        if not term.strip():
-                            continue
-                        try:
-                            hits = page.search_for(term.strip())
-                            for rect in hits:
-                                page.add_redact_annot(rect, fill=(0, 0, 0))
-                                total_redactions += 1
-                                categories_used.add("Custom Terms")
-                        except Exception as err:
-                            self.log_line.emit(
-                                f"  Warning [custom '{term}']: {err}")
+                # ── PDF ───────────────────────────────────────────────────
+                else:
+                    if not _HAS_FITZ:
+                        self.log_line.emit(
+                            "ERROR: PyMuPDF is not installed. Run: pip install PyMuPDF")
+                        failed += 1
+                        continue
 
-                    # ── Step 2: permanently apply redactions ──────────────────
-                    page.apply_redactions()
+                    doc              = fitz.open(src)
+                    total_redactions = 0
+                    categories_used  = set()
+                    pages_processed  = len(doc)
 
-                    # ── Step 3: optional watermark (added after redactions) ───
-                    if self.add_watermark:
-                        try:
-                            wm_rect = fitz.Rect(
-                                72,
-                                page.rect.height - 30,
-                                page.rect.width - 72,
-                                page.rect.height - 10,
-                            )
-                            page.insert_textbox(
-                                wm_rect,
-                                "REDACTED — ClaimsCo",
-                                fontsize=8,
-                                color=(0.7, 0.7, 0.7),
-                                align=fitz.TEXT_ALIGN_CENTER,
-                            )
-                        except Exception:
-                            pass
+                    for page in doc:
+                        for _key, (pattern, label) in self.patterns.items():
+                            try:
+                                rects = find_pattern_rects(page, pattern)
+                                for rect in rects:
+                                    page.add_redact_annot(rect, fill=(0, 0, 0))
+                                    total_redactions += 1
+                                    categories_used.add(label)
+                            except Exception as err:
+                                self.log_line.emit(
+                                    f"  Warning [{label}]: {err}")
 
-                # Save the redacted copy (garbage=4 removes orphaned objects)
-                doc.save(dst, garbage=4, deflate=True)
-                doc.close()
+                        for term in self.custom_terms:
+                            if not term.strip():
+                                continue
+                            try:
+                                hits = page.search_for(term.strip())
+                                for rect in hits:
+                                    page.add_redact_annot(rect, fill=(0, 0, 0))
+                                    total_redactions += 1
+                                    categories_used.add("Custom Terms")
+                            except Exception as err:
+                                self.log_line.emit(
+                                    f"  Warning [custom '{term}']: {err}")
+
+                        page.apply_redactions()
+
+                        if self.add_watermark:
+                            try:
+                                wm_rect = fitz.Rect(
+                                    72,
+                                    page.rect.height - 30,
+                                    page.rect.width - 72,
+                                    page.rect.height - 10,
+                                )
+                                page.insert_textbox(
+                                    wm_rect,
+                                    "REDACTED — ClaimsCo",
+                                    fontsize=8,
+                                    color=(0.7, 0.7, 0.7),
+                                    align=fitz.TEXT_ALIGN_CENTER,
+                                )
+                            except Exception:
+                                pass
+
+                    doc.save(dst, garbage=4, deflate=True)
+                    doc.close()
 
                 cat_list = ", ".join(sorted(categories_used)) or "None"
                 self.log_line.emit(
-                    f"  OK — {pages_processed} pages | "
+                    f"  OK — {pages_processed} page(s) | "
                     f"{total_redactions} redactions | {cat_list}"
                 )
                 log_entries.append(
@@ -567,7 +691,7 @@ class RedactionTab(QWidget):
         left_layout  = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 0, 0)
 
-        files_group  = QGroupBox("PDFs in Folder")
+        files_group  = QGroupBox("Documents in Folder (PDF, TXT, DOCX)")
         fg           = QVBoxLayout(files_group)
 
         sel_row = QHBoxLayout()
@@ -668,25 +792,25 @@ class RedactionTab(QWidget):
     def _populate_file_list(self):
         self._file_list.clear()
         try:
-            pdfs = sorted(
+            docs = sorted(
                 f for f in os.listdir(self.folder)
-                if f.lower().endswith(".pdf")
+                if os.path.splitext(f)[1].lower() in SUPPORTED_EXTENSIONS
             )
         except Exception as e:
             self._log_append(f"ERROR reading folder: {e}")
             return
 
-        if not pdfs:
-            self._log_append("No PDF files found in this folder.")
+        if not docs:
+            self._log_append("No supported files found (PDF, TXT, DOCX).")
             return
 
-        for fn in pdfs:
+        for fn in docs:
             item = QListWidgetItem(fn)
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
             item.setCheckState(Qt.Checked)
             self._file_list.addItem(item)
 
-        self._log_append(f"Found {len(pdfs)} PDF(s) in folder.")
+        self._log_append(f"Found {len(docs)} document(s) in folder.")
 
     def _toggle_all_files(self, checked: bool):
         state = Qt.Checked if checked else Qt.Unchecked
@@ -1163,7 +1287,7 @@ class ExtractionTab(QWidget):
         ll   = QVBoxLayout(left)
         ll.setContentsMargins(0, 0, 0, 0)
 
-        inv_group = QGroupBox("PDF Inventory  (SKIP = excluded internal notes)")
+        inv_group = QGroupBox("Document Inventory  (SKIP = excluded internal notes)")
         ig = QVBoxLayout(inv_group)
         self._file_list = QListWidget()
         self._file_list.setSelectionMode(QListWidget.NoSelection)

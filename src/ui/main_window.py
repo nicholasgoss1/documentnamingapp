@@ -48,7 +48,7 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._apply_theme()
 
-        self.statusBar().showMessage("Ready. Drag and drop PDF files to begin.")
+        self.statusBar().showMessage("Ready. Drag and drop files to begin (PDF, TXT, DOCX).")
 
     def _build_menubar(self):
         menubar = self.menuBar()
@@ -274,27 +274,30 @@ class MainWindow(QMainWindow):
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
 
+    _ACCEPTED_EXTS = (".pdf", ".txt", ".docx")
+
     def dropEvent(self, event: QDropEvent):
         urls = event.mimeData().urls()
         files = []
         for url in urls:
             path = url.toLocalFile()
-            if path.lower().endswith(".pdf"):
+            if path.lower().endswith(self._ACCEPTED_EXTS):
                 files.append(path)
             elif os.path.isdir(path):
                 for root, dirs, filenames in os.walk(path):
                     for fn in filenames:
-                        if fn.lower().endswith(".pdf"):
+                        if fn.lower().endswith(self._ACCEPTED_EXTS):
                             files.append(os.path.join(root, fn))
         if files:
             self._process_files(files)
         else:
-            QMessageBox.information(self, "No PDFs", "No PDF files found in the dropped items.")
+            QMessageBox.information(self, "No Files", "No supported files found (PDF, TXT, DOCX).")
 
     def _open_files(self):
         last_dir = self.settings.get("last_directory", "")
         files, _ = QFileDialog.getOpenFileNames(
-            self, "Select PDF Files", last_dir, "PDF Files (*.pdf)"
+            self, "Select Document Files", last_dir,
+            "Document Files (*.pdf *.txt *.docx);;PDF Files (*.pdf);;Text Files (*.txt);;Word Files (*.docx)"
         )
         if files:
             self.settings.set("last_directory", os.path.dirname(files[0]))

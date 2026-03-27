@@ -1,14 +1,59 @@
 """
-PDF text extraction and preview using PyMuPDF (fitz).
+Document text extraction and preview.
+Supports PDF (via PyMuPDF), plain-text (.txt), and Word (.docx).
 All processing is local. No network calls.
 """
 import hashlib
+import os
 import re
 import unicodedata
 from pathlib import Path
 from typing import Optional
 
 import fitz  # PyMuPDF
+
+try:
+    from docx import Document as DocxDocument
+    _HAS_DOCX = True
+except ImportError:
+    _HAS_DOCX = False
+
+# Recognised document extensions (used by callers for filtering)
+SUPPORTED_EXTENSIONS = (".pdf", ".txt", ".docx")
+
+
+def _is_pdf(path: str) -> bool:
+    return path.lower().endswith(".pdf")
+
+
+def _is_txt(path: str) -> bool:
+    return path.lower().endswith(".txt")
+
+
+def _is_docx(path: str) -> bool:
+    return path.lower().endswith(".docx")
+
+
+def _read_text_file(path: str) -> str:
+    """Read a plain-text file, trying common encodings."""
+    for enc in ("utf-8", "utf-8-sig", "cp1252", "latin-1"):
+        try:
+            with open(path, "r", encoding=enc) as f:
+                return f.read()
+        except (UnicodeDecodeError, LookupError):
+            continue
+    return ""
+
+
+def _read_docx_file(path: str) -> str:
+    """Extract all paragraph text from a .docx file."""
+    if not _HAS_DOCX:
+        return ""
+    try:
+        doc = DocxDocument(path)
+        return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+    except Exception:
+        return ""
 
 # Text extraction flags: exclude TEXT_PRESERVE_LIGATURES so that PyMuPDF
 # decomposes ligature characters (ﬁ→fi, ﬂ→fl) at extraction time.
@@ -45,7 +90,12 @@ def _clean_text(text: str) -> str:
 
 
 def extract_text(file_path: str, max_pages: int = 5) -> str:
-    """Extract text from the first N pages of a PDF."""
+    """Extract text from the first N pages of a document (PDF, TXT, or DOCX)."""
+    if _is_txt(file_path):
+        return _clean_text(_read_text_file(file_path))
+    if _is_docx(file_path):
+        return _clean_text(_read_docx_file(file_path))
+    # PDF path
     doc = None
     try:
         doc = fitz.open(file_path)
@@ -62,7 +112,12 @@ def extract_text(file_path: str, max_pages: int = 5) -> str:
 
 
 def extract_page1_text(file_path: str) -> str:
-    """Extract text from page 1 only."""
+    """Extract text from page 1 (or entire file for TXT/DOCX)."""
+    if _is_txt(file_path):
+        return _clean_text(_read_text_file(file_path))
+    if _is_docx(file_path):
+        return _clean_text(_read_docx_file(file_path))
+    # PDF path
     doc = None
     try:
         doc = fitz.open(file_path)
@@ -79,7 +134,10 @@ def extract_page1_text(file_path: str) -> str:
 
 
 def get_page_count(file_path: str) -> int:
-    """Return number of pages."""
+    """Return number of pages (1 for TXT/DOCX)."""
+    if _is_txt(file_path) or _is_docx(file_path):
+        return 1
+    # PDF path
     doc = None
     try:
         doc = fitz.open(file_path)
@@ -93,7 +151,9 @@ def get_page_count(file_path: str) -> int:
 
 def render_page_pixmap(file_path: str, page_num: int = 0,
                        zoom: float = 1.5) -> Optional[bytes]:
-    """Render a page to PNG bytes for preview."""
+    """Render a page to PNG bytes for preview. Returns None for non-PDF files."""
+    if not _is_pdf(file_path):
+        return None  # caller should fall back to text preview
     doc = None
     try:
         doc = fitz.open(file_path)
@@ -125,6 +185,9 @@ def extract_page1_spatial(file_path: str) -> dict:
     Each value is a string of the text blocks in that region.
     """
     regions = {"top_left": "", "top_right": "", "top": "", "body": "", "bottom": ""}
+    # Non-PDF files have no spatial layout — return empty regions
+    if not _is_pdf(file_path):
+        return regions
     doc = None
     try:
         doc = fitz.open(file_path)
@@ -188,7 +251,10 @@ def extract_page1_rawtext(file_path: str) -> str:
     This is a fallback for PDFs where standard text extraction misses
     content due to unusual font encodings or PDF structure.  It extracts
     individual words (via get_text("words")) and joins them with spaces.
+    For TXT/DOCX files, returns the same as extract_page1_text.
     """
+    if not _is_pdf(file_path):
+        return extract_page1_text(file_path)
     doc = None
     try:
         doc = fitz.open(file_path)
