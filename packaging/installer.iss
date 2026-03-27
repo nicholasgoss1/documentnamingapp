@@ -2,7 +2,9 @@
 ; Download Inno Setup from https://jrsoftware.org/isdl.php
 
 [Setup]
-AppId={{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}
+; PERMANENT AppId — never change this GUID across future versions.
+; It ensures upgrades silently replace the previous installation.
+AppId={{4D574B20-DB46-4E5F-B09B-7F815975303B}
 AppName=ClaimsCo Document Tools
 AppVersion=2.0.0
 AppVerName=ClaimsCo Document Tools v2.0.0
