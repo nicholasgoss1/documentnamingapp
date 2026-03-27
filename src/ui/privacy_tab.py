@@ -27,20 +27,55 @@ _NLP = None
 
 
 def _load_spacy_model():
+    import sys
+    from pathlib import Path
+
     try:
         import spacy
-        import sys
-        from pathlib import Path
-        # Try bundled path first (PyInstaller)
-        base = getattr(sys, '_MEIPASS', None)
-        if base:
-            model_path = Path(base) / "en_core_web_sm"
-            if model_path.exists():
-                return spacy.load(str(model_path))
-        # Try installed model
+    except ImportError:
+        logger.debug("spaCy not installed")
+        return None
+
+    # PyInstaller bundle: _MEIPASS points to _internal/ folder
+    base = getattr(sys, '_MEIPASS', None)
+    if base:
+        # The model package is at _internal/en_core_web_sm/
+        # The actual pipeline data is in the version-named subfolder
+        pkg_dir = Path(base) / "en_core_web_sm"
+        if pkg_dir.exists():
+            # Find the en_core_web_sm-X.Y.Z subfolder containing config.cfg
+            for child in pkg_dir.iterdir():
+                if child.is_dir() and (child / "config.cfg").exists():
+                    try:
+                        logger.debug("Loading spaCy model from bundle: %s", child)
+                        return spacy.load(str(child))
+                    except Exception as e:
+                        logger.debug("Bundle load failed from %s: %s", child, e)
+            # Try loading the package directory itself as fallback
+            try:
+                return spacy.load(str(pkg_dir))
+            except Exception as e:
+                logger.debug("Bundle load (pkg_dir) failed: %s", e)
+
+        # Also check next to the executable
+        exe_dir = Path(sys.executable).parent
+        for candidate in [
+            exe_dir / "en_core_web_sm",
+            exe_dir / "_internal" / "en_core_web_sm",
+        ]:
+            if candidate.exists():
+                for child in candidate.iterdir():
+                    if child.is_dir() and (child / "config.cfg").exists():
+                        try:
+                            return spacy.load(str(child))
+                        except Exception:
+                            pass
+
+    # Development / installed mode
+    try:
         return spacy.load("en_core_web_sm")
     except Exception as e:
-        logger.debug("spaCy load failed: %s", e)
+        logger.debug("spaCy load (installed) failed: %s", e)
         return None
 
 
