@@ -67,31 +67,17 @@ end;
 function InitializeSetup(): Boolean;
 var
   UninstallString: String;
-  InstalledVersion: String;
   ResultCode: Integer;
 begin
   Result := True;
   UninstallString := GetUninstallString();
+  // If a previous version exists, uninstall it silently before proceeding
   if UninstallString <> '' then
   begin
-    InstalledVersion := GetInstalledVersion();
-    if MsgBox('ClaimsCo Document Tools version ' + InstalledVersion + ' is already installed.' + #13#10 + #13#10 +
-              'The previous version must be uninstalled before installing this version.' + #13#10 + #13#10 +
-              'Would you like to uninstall it now?',
-              mbConfirmation, MB_YESNO) = IDYES then
+    Exec(RemoveQuotes(UninstallString), '/SILENT', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    if GetUninstallString() <> '' then
     begin
-      Exec(RemoveQuotes(UninstallString), '/SILENT', '', SW_SHOW, ewWaitUntilTerminated, ResultCode);
-      // Verify uninstall succeeded
-      if GetUninstallString() <> '' then
-      begin
-        MsgBox('The previous version could not be uninstalled. Setup will now exit.', mbError, MB_OK);
-        Result := False;
-      end;
-    end
-    else
-    begin
-      MsgBox('The previous version must be uninstalled before installing this version.' + #13#10 +
-             'Setup will now exit.', mbInformation, MB_OK);
+      MsgBox('The previous version could not be removed. Setup will now exit.', mbError, MB_OK);
       Result := False;
     end;
   end;
