@@ -40,6 +40,26 @@
       "fields_corrected": [
         "what"
       ]
+    },
+    {
+      "timestamp": "2026-03-28T08:37:42.883487",
+      "original_filename": "Complainant - 26.03.2025 - ClaimsCo Complaint to IDR.pdf",
+      "text_snippet": " CHU Insurance \n Complaints Department \n 26/03/2025 \n Please refer to our Delegation of Authority for the above claim. We write to you on behalf of \n our mutual client: \n Client name \n Craig Toohill \n",
+      "ai_result": {
+        "who": "FF",
+        "entity": "CHU Insurance",
+        "date": "26.03.2025",
+        "what": "Delegation of Authority"
+      },
+      "corrected_result": {
+        "who": "FF",
+        "entity": "CHU Insurance",
+        "date": "26.03.2025",
+        "what": "ClaimCo complaint to IDR"
+      },
+      "fields_corrected": [
+        "what"
+      ]
     }
   ]
 }
