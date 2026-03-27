@@ -1,7 +1,11 @@
 """
-Main application window.
+Main application window with three-tab interface:
+  Tab 1 — Document Renamer
+  Tab 2 — Privacy Redaction
+  Tab 3 — Claude Extraction Pack
 """
 import os
+import logging
 from typing import List
 
 from PySide6.QtCore import Qt, QModelIndex
@@ -16,7 +20,7 @@ from PySide6.QtWidgets import (
     QTableView, QLabel, QPushButton, QProgressBar, QLineEdit,
     QComboBox, QCheckBox, QMessageBox, QFileDialog, QHeaderView,
     QAbstractItemView, QInputDialog, QGroupBox, QStatusBar,
-    QMenu, QMenuBar, QToolBar
+    QMenu, QMenuBar, QToolBar, QTabWidget,
 )
 
 from src.core.settings import Settings, APP_VERSION
@@ -31,16 +35,30 @@ from src.ui.theme import DARK_THEME, LIGHT_THEME
 from src.services.rename_service import (
     validate_batch, execute_rename_batch, undo_last_batch, export_csv
 )
+from src.ui.privacy_tab import PrivacyTab
+from src.ui.extraction_tab import ExtractionTab
+
+logger = logging.getLogger(__name__)
+
+# AI status helper
+def _ai_status_text() -> str:
+    try:
+        from src.services.ai_classifier import groq_classifier
+        if groq_classifier.is_available():
+            return "AI: Groq (llama-3.1-8b-instant) \u2713"
+    except Exception:
+        pass
+    return "AI: Offline (rule-based only)"
 
 
 class MainWindow(QMainWindow):
-    """Main application window with drag-and-drop, table, and preview."""
+    """Main application window with three-tab interface."""
 
     def __init__(self, settings: Settings):
         super().__init__()
         self.settings = settings
         self._worker = None
-        self.setWindowTitle(f"Claim File Renamer v{APP_VERSION}")
+        self.setWindowTitle(f"ClaimsCo Document Tools v{APP_VERSION}")
         self.setMinimumSize(1280, 720)
         self.setAcceptDrops(True)
 
@@ -48,6 +66,10 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._apply_theme()
 
+        self._ai_label = QLabel(_ai_status_text())
+        self._ai_label.setCursor(Qt.PointingHandCursor)
+        self._ai_label.mousePressEvent = lambda _: self._open_settings()
+        self.statusBar().addPermanentWidget(self._ai_label)
         self.statusBar().showMessage("Ready. Drag and drop files to begin (PDF, TXT, DOCX).")
 
     def _build_menubar(self):
@@ -93,7 +115,18 @@ class MainWindow(QMainWindow):
     def _build_ui(self):
         central = QWidget()
         self.setCentralWidget(central)
-        main_layout = QVBoxLayout(central)
+        outer = QVBoxLayout(central)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        # ── Tab widget ────────────────────────────────────────────────
+        self._tabs = QTabWidget()
+        outer.addWidget(self._tabs)
+
+        # Tab 1 — Document Renamer
+        renamer_widget = QWidget()
+        renamer_widget.setAcceptDrops(True)
+        main_layout = QVBoxLayout(renamer_widget)
         main_layout.setContentsMargins(8, 8, 8, 8)
         main_layout.setSpacing(6)
 
@@ -259,6 +292,16 @@ class MainWindow(QMainWindow):
         splitter.setSizes([900, 380])
         main_layout.addWidget(splitter, 1)
 
+        self._tabs.addTab(renamer_widget, "Document Renamer")
+
+        # Tab 2 — Privacy Redaction
+        self._privacy_tab = PrivacyTab()
+        self._tabs.addTab(self._privacy_tab, "Privacy Redaction")
+
+        # Tab 3 — Claude Extraction Pack
+        self._extraction_tab = ExtractionTab()
+        self._tabs.addTab(self._extraction_tab, "Claude Extraction Pack")
+
     def _apply_theme(self):
         dark = self.settings.get("dark_mode", True)
         self.setStyleSheet(DARK_THEME if dark else LIGHT_THEME)
@@ -329,10 +372,13 @@ class MainWindow(QMainWindow):
         count = len(all_records)
         self._file_count_label.setText(f"{count} files loaded")
         self.statusBar().showMessage(f"Done. {len(records)} new files processed. {count} total.")
+        self._ai_label.setText(_ai_status_text())
         self._worker = None
 
     def _on_processing_error(self, msg: str):
         self._progress.setVisible(False)
+        if "groq" in msg.lower() or "Groq" in msg:
+            self._ai_label.setText("AI: Groq error \u2014 using rule-based fallback")
         QMessageBox.critical(self, "Processing Error", msg)
         self._worker = None
 

@@ -5,13 +5,13 @@
 AppId={{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}
 AppName=ClaimsCo Document Tools
 AppVersion=2.0.0
-AppVerName=ClaimsCo Document Tools 2.0.0
+AppVerName=ClaimsCo Document Tools v2.0.0
 AppPublisher=ClaimsCo Pty Ltd
 DefaultDirName={autopf}\ClaimsCo_Tools
 DefaultGroupName=ClaimsCo Document Tools
 DisableProgramGroupPage=yes
 OutputDir=..\installer_output
-OutputBaseFilename=ClaimsCo_Tools_Setup_2.0.0
+OutputBaseFilename=ClaimsCo_Tools_Setup_v2.0.0
 SetupIconFile=..\assets\icon.ico
 Compression=lzma
 SolidCompression=yes

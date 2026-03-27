@@ -7,8 +7,8 @@ import sys
 from pathlib import Path
 from copy import deepcopy
 
-APP_NAME = "ClaimFileRenamer"
-APP_VERSION = "1.6.0"
+APP_NAME = "ClaimsCo Document Tools"
+APP_VERSION = "2.0.0"
 
 
 def get_app_data_dir() -> Path:

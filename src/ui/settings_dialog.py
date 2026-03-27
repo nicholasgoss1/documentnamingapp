@@ -5,7 +5,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget,
     QLabel, QLineEdit, QTextEdit, QPushButton, QSpinBox,
-    QCheckBox, QComboBox, QGroupBox, QFormLayout, QMessageBox
+    QCheckBox, QComboBox, QGroupBox, QFormLayout, QMessageBox,
 )
 
 from src.core.settings import Settings
@@ -114,6 +114,30 @@ class SettingsDialog(QDialog):
         self._entity_rules = QTextEdit()
         il.addWidget(self._entity_rules)
         tabs.addTab(include_tab, "Entity Rules")
+
+        # AI Classification tab (read-only status)
+        ai_tab = QWidget()
+        ai_layout = QVBoxLayout(ai_tab)
+        ai_layout.addWidget(QLabel("AI-Enhanced Classification"))
+
+        try:
+            from src.services.ai_classifier import groq_classifier
+            ai_available = groq_classifier.is_available()
+        except Exception:
+            ai_available = False
+
+        status_text = "Enabled (Groq free tier)" if ai_available else "Disabled \u2014 key not configured"
+        ai_form = QFormLayout()
+        status_label = QLabel(status_text)
+        status_label.setObjectName("subtitleLabel")
+        ai_form.addRow("Status:", status_label)
+        ai_form.addRow("Model:", QLabel("llama-3.1-8b-instant"))
+        ai_form.addRow("Limit:", QLabel("14,400 classifications per day (shared across all users)"))
+        ai_form.addRow("Trigger:", QLabel("Only called when confidence < 75%"))
+        ai_form.addRow("Fallback:", QLabel("Fully offline rule-based classification"))
+        ai_layout.addLayout(ai_form)
+        ai_layout.addStretch()
+        tabs.addTab(ai_tab, "AI Classification")
 
         layout.addWidget(tabs)
 

@@ -1,26 +1,55 @@
-# ClaimsCo Document Tools
+# ClaimsCo Document Tools v2.0
 
 A local-first Windows desktop app for insurance claim document processing.
-All processing happens on your machine — no data leaves the device.
+All processing happens on your machine — no data leaves the device unless Groq AI classification is enabled.
 
 ---
 
-## What it does
+## Three Tools in One
 
 The app has three tabs:
 
-**Tab 1 — Document Renaming**
+**Tab 1 — Document Renamer**
 Bulk-renames insurance claim PDFs into ClaimsCo's standard naming format:
 `WHO - DATE - ENTITY - WHAT.pdf`
 AI-assisted classification with inline editing, PDF preview, and rollback.
 
 **Tab 2 — Privacy Redaction**
-Redacts sensitive personal information from PDFs before sharing or extraction.
-Redacted copies are saved to a `Redacted/` subfolder — originals are never touched.
+Scans PDFs for personally identifiable information (names, phone numbers, policy numbers, addresses) and replaces them with anonymised tokens like `[CLIENT_ID_001]`. Export a redacted text pack and view the full token map.
 
-**Tab 3 — PDF Extraction**
-Extracts all PDFs in a matter folder into a single structured Master Evidence TXT file
-ready for upload to Claude AFCA Assistant v24.
+**Tab 3 — Claude Extraction Pack**
+Groq-assisted verbatim extraction for AFCA submission drafting. Generates a structured Verbatim Pack with VP1–VP6 sections from matter folder PDFs, ready for upload to Claude AFCA Assistant v24.
+
+---
+
+## AI-Enhanced Classification
+
+- Uses **Groq free tier** with the `llama-3.1-8b-instant` model
+- **14,400 classifications per day** (shared across all users on the free tier)
+- Only called when rule-based confidence is below 75% — most documents are classified locally without any API calls
+- Falls back to fully offline rule-based classification automatically if Groq is unavailable
+- 8-second timeout per call — never blocks the app
+- API key is configured in `src/services/ai_classifier.py`
+
+## Privacy Redaction
+
+- **Fully local processing** — nothing is sent externally
+- Uses spaCy `en_core_web_sm` for person name detection (2+ word names only)
+- Regex patterns for Australian phone numbers, policy numbers, and street addresses
+- Token format: `[CLIENT_ID_001]`, `[CLIENT_ID_002]`, etc.
+- Optional Groq second-pass detection for PII missed by the primary scan
+
+## Claude Extraction Pack
+
+- Groq-assisted smart extraction understands document types and pulls relevant passages
+- VP1: PDS clause sections
+- VP2: Complainant expert report conclusions and methodology
+- VP3: FF decisions and decline reasons
+- VP4: Builder/engineer scope methodology notes
+- VP5: Weather evidence key data passages
+- VP6: Solar and specialist technical reports
+- Falls back to raw text extraction when Groq is unavailable
+- Missing section warnings help identify gaps in evidence
 
 ---
 
@@ -31,11 +60,13 @@ ready for upload to Claude AFCA Assistant v24.
 1. Double-click `ClaimsCo_Tools_Setup.bat`
 2. It will install all Python dependencies automatically.
 3. Optionally install Tesseract and Poppler (see below).
+4. For spaCy NER: `python -m spacy download en_core_web_sm`
 
 ### Manual setup
 
 ```
 pip install -r requirements.txt
+python -m spacy download en_core_web_sm
 ```
 
 ### Python version
@@ -65,119 +96,60 @@ Required if you use Tesseract OCR.
 
 ## Running the app
 
-Double-click `ClaimsCo_Tools.py`, or run:
-
 ```
-python ClaimsCo_Tools.py
+python main.py
 ```
 
----
-
-## How to use each tab
-
-### Tab 1 — Document Renaming
-
-1. Drag and drop PDF files onto the table, or use **File → Open Files**.
-2. Review the AI-suggested names (WHO, DATE, ENTITY, WHAT columns).
-3. Edit any field inline by clicking on it.
-4. Use the bulk action toolbar to set fields across multiple rows.
-5. Click **Approve Selected** or **Approve All**.
-6. Click **Rename Approved** to rename files on disk.
-7. Use **Undo Last Batch** to reverse if needed.
-
-### Tab 2 — Privacy Redaction
-
-1. Click **Browse Folder** and select your matter folder.
-2. The app lists all PDFs found. All are checked by default.
-3. Uncheck any files you do not want to redact.
-4. Select which redaction rules to apply (all on by default).
-5. Optionally add custom terms (names, policy numbers, etc.) in the text box.
-6. Click **Preview Count** to see how many instances will be redacted.
-7. Click **Redact Selected Files** when ready.
-8. Redacted copies are saved to `[matter_folder]/Redacted/`.
-9. A `redaction_log.txt` is saved in the same Redacted folder.
-
-**Redaction rules available:**
-- Australian names (Title Case word pairs)
-- Mobile numbers (04xx xxx xxx)
-- Landline numbers ((0x) xxxx xxxx)
-- Street addresses
-- Postcodes
-- Email addresses
-- Tax File Numbers (TFN)
-- Medicare numbers
-- Dates of birth
-- BSB numbers
-- Bank account numbers
-- Policy numbers
-- Claim numbers
-- Custom terms (exact match)
-
-### Tab 3 — PDF Extraction
-
-1. Click **Browse Folder** and select your matter folder (or the `Redacted/` subfolder from Tab 2).
-2. The inventory panel shows all PDFs and their classifications.
-   Files identified as internal notes are marked `[SKIP]` and excluded automatically.
-3. Click **Extract PDFs**.
-4. The app processes each PDF and writes a Master Evidence TXT file to:
-   `[matter_folder]/[FolderName]_MasterEvidence.txt`
-5. Every page is formatted as a citation block:
-   ```
-   [SOURCE: filename.pdf | PAGE: N]
-   ...page text...
-   ────────────────────────────────────────────────────────────
-   ```
-6. The output includes a file inventory, all extracted content, and a token estimate.
-
-**Files excluded automatically (internal notes):**
-Filenames containing: `claim notes history`, `claim history notes`, `timeline`,
-`internal notes`, `working notes`, `claimsco notes` (case-insensitive)
+Or run `src/ui/main_window.py` directly:
+```
+python -c "from src.ui.main_window import MainWindow; from src.core.settings import Settings; from PySide6.QtWidgets import QApplication; import sys; app = QApplication(sys.argv); w = MainWindow(Settings()); w.show(); sys.exit(app.exec())"
+```
 
 ---
 
 ## Privacy and data handling
 
-- **All processing is fully local.** No files, text, or metadata are ever sent to any server.
-- **Tab 2**: Original files are never modified. Redacted copies are written to a separate subfolder.
-- **Tab 3**: The output TXT file is saved to your local matter folder.
-- The app does not phone home, collect analytics, or require internet access.
+- **Tab 1**: All rule-based processing is fully local. When Groq AI is enabled, the first 1200 characters of extracted text are sent to Groq's API for low-confidence documents only.
+- **Tab 2**: All spaCy/regex processing is fully local. Optional Groq second-pass sends already-redacted text only.
+- **Tab 3**: Document text is sent to Groq for intelligent extraction. Falls back to local-only raw text extraction when Groq is unavailable.
+- The app does not collect analytics or phone home.
 
 ---
 
 ## Supported file types
 
 - PDF (`.pdf`) — all tabs
-- Scanned PDFs are supported in Tab 3 if Tesseract OCR and Poppler are installed.
+- TXT (`.txt`) — Tab 1 renaming
+- DOCX (`.docx`) — Tab 1 renaming
+- Scanned PDFs are supported if Tesseract OCR and Poppler are installed.
 
 ---
 
 ## File structure
 
 ```
-ClaimsCo_Tools.py          Main combined app (all three tabs)
-requirements.txt           Python dependencies
-ClaimsCo_Tools_Setup.bat   One-click Windows setup
-README.md                  This file
-main.py                    Original Claim File Renamer entry point (preserved)
-src/                       Original Claim File Renamer source (preserved)
+main.py                    Entry point
+src/core/                  Data models and settings
+src/services/              Classification, extraction, AI services
+src/ui/                    PySide6 GUI (main_window, tabs, dialogs)
 assets/                    Icons and logo
+packaging/                 PyInstaller and Inno Setup files
+tests/                     Unit tests
 ```
 
 ---
 
 ## Troubleshooting
 
-**"ModuleNotFoundError: No module named 'pdfplumber'"**
+**"ModuleNotFoundError: No module named 'PySide6'"**
 Run `ClaimsCo_Tools_Setup.bat` or `pip install -r requirements.txt`.
 
-**"Tesseract OCR not found"**
-Install Tesseract from https://github.com/UB-Mannheim/tesseract/wiki.
-The app still works for text-based PDFs without it.
+**"AI: Offline (rule-based only)"**
+The Groq API key is not configured. Edit `src/services/ai_classifier.py` and replace `gsk_PASTE_YOUR_KEY_HERE` with your Groq API key.
 
-**Tab 2 redaction produces no changes**
-Ensure the PDF has a text layer (not a pure scan). Use Preview Count first.
-Scanned PDFs require Tesseract + Poppler for OCR-based text location.
+**Tab 2 shows "spaCy not available"**
+Run `python -m spacy download en_core_web_sm`.
 
 **App is slow on large folders**
 All long-running operations run in background threads — the UI stays responsive.
-Large matter folders (50+ PDFs) may take several minutes.
+Groq extraction adds ~5-15 seconds per document.

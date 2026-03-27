@@ -291,6 +291,28 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
     record.confidence_breakdown = compute_confidence(record, settings)
     record.confidence = record.confidence_breakdown.total()
 
+    # ── Groq AI classification for low-confidence documents ──────────
+    if record.confidence < 75:
+        try:
+            from src.services.ai_classifier import groq_classifier
+            if groq_classifier.is_available():
+                ai_result = groq_classifier.classify_document(record.extracted_text)
+                if ai_result:
+                    # Override fields with AI results, running through normalizers
+                    if ai_result.get("who"):
+                        record.who = normalize_who(ai_result["who"])
+                    if ai_result.get("entity"):
+                        record.entity = normalize_entity(ai_result["entity"], settings)
+                    if ai_result.get("what"):
+                        record.what = normalize_what(ai_result["what"], settings)
+                    if ai_result.get("date") and ai_result["date"] != "NO DATE":
+                        record.date = ai_result["date"]
+                    # Boost confidence
+                    record.confidence = min(99, record.confidence + 15)
+                    record.confidence_breakdown.penalties.append(("ai_groq", -15))
+        except Exception:
+            pass  # Never crash pipeline due to AI failure
+
     # Check UNSURE
     record.is_unsure = should_mark_unsure(record.confidence, settings)
 
