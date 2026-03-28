@@ -820,6 +820,26 @@
       "fields_corrected": [
         "entity"
       ]
+    },
+    {
+      "timestamp": "2026-03-28T17:47:14.703092",
+      "original_filename": "2b. FF - 06.05.2025 - EZY Projects Roof Report.pdf",
+      "text_snippet": " \n \n \n \nBUILDERS ROOF REPORT\n \nClaim Number: 6200198762 \nConducted on 06/05/2025 \nPrepared by: Carlo Cervo \nLocation: 37 Dangar Street, Armidale NSW 2350 \n \n \nEZ18354-CF46612 Roof Report\n \nFront of Pr",
+      "ai_result": {
+        "who": "FF",
+        "entity": "EZY Projects Roof Report",
+        "date": "06.05.2025",
+        "what": "Roof Report"
+      },
+      "corrected_result": {
+        "who": "FF",
+        "entity": "EZY Projects",
+        "date": "06.05.2025",
+        "what": "Roof Report"
+      },
+      "fields_corrected": [
+        "entity"
+      ]
     }
   ]
 }
