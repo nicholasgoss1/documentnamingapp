@@ -860,6 +860,26 @@
       "fields_corrected": [
         "what"
       ]
+    },
+    {
+      "timestamp": "2026-03-28T17:47:50.747565",
+      "original_filename": "1e. Complainant - 12.11.2025 - PV LAB - EL Testing Report.pdf",
+      "text_snippet": "ABN 18 166 787 800 \nwww.pv-lab.com.au \n4/45 Vicars Street, Mitchell ACT 2911 \n \n \n \nTest report for \nSolarez Energy \n2511-SEZ-108 \nWednesday, November 12, 2025 \n \n \nClient \nSolarez Energy \n \n \nConsult",
+      "ai_result": {
+        "who": "Complainant",
+        "entity": "PV Lab Australia",
+        "date": "12.11.2025",
+        "what": "El Testing Report"
+      },
+      "corrected_result": {
+        "who": "Complainant",
+        "entity": "Solarez",
+        "date": "12.11.2025",
+        "what": "El Testing Report"
+      },
+      "fields_corrected": [
+        "entity"
+      ]
     }
   ]
 }
