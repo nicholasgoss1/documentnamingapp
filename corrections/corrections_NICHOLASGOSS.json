@@ -680,6 +680,26 @@
       "fields_corrected": [
         "who"
       ]
+    },
+    {
+      "timestamp": "2026-03-28T17:43:34.879316",
+      "original_filename": "3. AFCA - 16.03.2026 - Preliminary Assessment.pdf",
+      "text_snippet": " \n \n \n \n \n16 March 2026 \n \n \nEdr Staff \nClaimsCo \nedr@claimsco.com.au \n \nDear Edr \n \nComplainant(s) \nJan Hall \nFinancial firm \nAllianz Australia Insurance Limited (Allianz) \nCase number \n12-26-349227 ",
+      "ai_result": {
+        "who": "AFCA",
+        "entity": "Allianz",
+        "date": "16.03.2026",
+        "what": "Preliminary Assessment"
+      },
+      "corrected_result": {
+        "who": "AFCA",
+        "entity": "AFCA",
+        "date": "16.03.2026",
+        "what": "Preliminary Assessment"
+      },
+      "fields_corrected": [
+        "entity"
+      ]
     }
   ]
 }
