@@ -549,13 +549,26 @@ class PrivacyTab(QWidget):
 
         rp_header = QHBoxLayout()
         rp_header.addWidget(QLabel("Redactions"))
-        self._select_all_btn = QPushButton("Select All")
-        self._select_all_btn.setFixedHeight(24)
+        self._select_all_btn = QPushButton("\u2611 Select All")
+        self._select_all_btn.setFixedHeight(26)
+        self._select_all_btn.setStyleSheet("font-size: 12px; padding: 2px 8px;")
         self._select_all_btn.clicked.connect(self._toggle_select_all)
         rp_header.addWidget(self._select_all_btn)
         rp_layout.addLayout(rp_header)
 
         self._redact_list = QListWidget()
+        self._redact_list.setStyleSheet("""
+            QListWidget::indicator {
+                width: 16px; height: 16px;
+                border: 2px solid #89b4fa;
+                border-radius: 3px;
+                background: #313244;
+            }
+            QListWidget::indicator:checked {
+                background: #89b4fa;
+                border-color: #89b4fa;
+            }
+        """)
         self._redact_list.itemClicked.connect(self._on_redact_item_clicked)
         rp_layout.addWidget(self._redact_list)
 
@@ -871,7 +884,6 @@ class PrivacyTab(QWidget):
         count = self._redact_list.count()
         if count == 0:
             return
-        # Check if all are already checked
         all_checked = all(
             self._redact_list.item(i).checkState() == Qt.Checked
             for i in range(count)
@@ -879,7 +891,10 @@ class PrivacyTab(QWidget):
         new_state = Qt.Unchecked if all_checked else Qt.Checked
         for i in range(count):
             self._redact_list.item(i).setCheckState(new_state)
-        self._select_all_btn.setText("Deselect All" if not all_checked else "Select All")
+        if all_checked:
+            self._select_all_btn.setText("\u2611 Select All")
+        else:
+            self._select_all_btn.setText("\u2610 Deselect All")
 
     def _remove_selected_boxes(self):
         """Remove all checked redaction boxes. Log corrections for AI boxes."""

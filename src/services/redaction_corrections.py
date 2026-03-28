@@ -14,6 +14,7 @@ from typing import List
 logger = logging.getLogger(__name__)
 
 _MAX_CORRECTIONS = 200
+_WRITE_LOCK = threading.Lock()
 
 
 def _store_dir() -> Path:
@@ -35,48 +36,69 @@ def _load() -> list:
     if not path.exists():
         return []
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
+        raw = path.read_text(encoding="utf-8").strip()
+        if not raw:
+            return []
+        # Handle corrupted file (multiple JSON arrays concatenated)
+        # Find the first valid JSON array
+        data = json.loads(raw)
         return data if isinstance(data, list) else []
+    except json.JSONDecodeError:
+        # Try to salvage: find first complete JSON array
+        try:
+            raw = path.read_text(encoding="utf-8").strip()
+            bracket_depth = 0
+            for i, ch in enumerate(raw):
+                if ch == '[':
+                    bracket_depth += 1
+                elif ch == ']':
+                    bracket_depth -= 1
+                    if bracket_depth == 0:
+                        data = json.loads(raw[:i + 1])
+                        return data if isinstance(data, list) else []
+        except Exception:
+            pass
+        return []
     except Exception:
         return []
 
 
 def _save(corrections: list):
     try:
-        with open(_store_path(), "w", encoding="utf-8") as f:
+        path = _store_path()
+        # Atomic write: write to temp then rename
+        tmp = path.with_suffix(".tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(corrections[-_MAX_CORRECTIONS:], f, indent=2, ensure_ascii=False)
+        tmp.replace(path)
     except Exception as e:
         logger.debug("Failed to save redaction corrections: %s", e)
 
 
 def log_redaction_correction(document_type: str, text_fragment: str, action: str):
-    """Log a redaction correction asynchronously.
-    action: 'should_redact' or 'should_not_redact'
-    """
+    """Log a redaction correction. Thread-safe with lock to prevent corruption."""
     def _write():
-        try:
-            corrections = _load()
-            corrections.append({
-                "document_type": document_type,
-                "text_fragment": text_fragment,
-                "action": action,
-                "timestamp": datetime.now().isoformat(),
-            })
-            _save(corrections)
-            # Sync to GitHub
+        with _WRITE_LOCK:
             try:
-                from src.services.github_sync import github_sync
-                if github_sync.is_available():
-                    computer = os.environ.get("COMPUTERNAME", "unknown")
-                    # Upload as a separate file from classification corrections
-                    path = _store_path()
-                    if path.exists():
-                        github_sync.upload_corrections(str(path))
-            except Exception:
-                pass
-        except Exception as e:
-            logger.debug("Failed to log redaction correction: %s", e)
+                corrections = _load()
+                corrections.append({
+                    "document_type": document_type,
+                    "text_fragment": text_fragment,
+                    "action": action,
+                    "timestamp": datetime.now().isoformat(),
+                })
+                _save(corrections)
+                # Sync to GitHub
+                try:
+                    from src.services.github_sync import github_sync
+                    if github_sync.is_available():
+                        path = _store_path()
+                        if path.exists():
+                            github_sync.upload_corrections(str(path))
+                except Exception:
+                    pass
+            except Exception as e:
+                logger.debug("Failed to log redaction correction: %s", e)
 
     threading.Thread(target=_write, daemon=True).start()
 
