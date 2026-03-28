@@ -900,6 +900,26 @@
       "fields_corrected": [
         "what"
       ]
+    },
+    {
+      "timestamp": "2026-03-28T17:48:17.864796",
+      "original_filename": "1d. Complainant - 12.11.2025 - Solarez Energy - EL Reporting Summary.pdf",
+      "text_snippet": " \n \n \n \n \n \nSOLAREZ ENERGY PTY LTD \n 346/7 Clunies Ross Court \nEight Mile Plains QLD 4113 \n Tel: 07 3497 4989 \n ABN 41 663 673 925 \n Electrical Licence: \n QLD 90588 - NSW 486176C \n \n \n \n12th of Novemb",
+      "ai_result": {
+        "who": "Complainant",
+        "entity": "Solarez",
+        "date": "12.11.2025",
+        "what": "Solar Report"
+      },
+      "corrected_result": {
+        "who": "Complainant",
+        "entity": "Solarez",
+        "date": "12.11.2025",
+        "what": "Solar Report summary letter"
+      },
+      "fields_corrected": [
+        "what"
+      ]
     }
   ]
 }
