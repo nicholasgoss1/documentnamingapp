@@ -6,14 +6,14 @@
 ; It ensures upgrades silently replace the previous installation.
 AppId={{4D574B20-DB46-4E5F-B09B-7F815975303B}
 AppName=ClaimsCo Document Tools
-AppVersion=2.0.6
-AppVerName=ClaimsCo Document Tools v2.0.6
+AppVersion=2.0.7
+AppVerName=ClaimsCo Document Tools v2.0.7
 AppPublisher=ClaimsCo Pty Ltd
 DefaultDirName={autopf}\ClaimsCo_Tools
 DefaultGroupName=ClaimsCo Document Tools
 DisableProgramGroupPage=yes
 OutputDir=..\installer_output
-OutputBaseFilename=ClaimsCo_Tools_Setup_v2.0.6
+OutputBaseFilename=ClaimsCo_Tools_Setup_v2.0.7
 SetupIconFile=..\assets\icon.ico
 Compression=lzma
 SolidCompression=yes

@@ -546,14 +546,29 @@ class PrivacyTab(QWidget):
         redact_panel = QWidget()
         rp_layout = QVBoxLayout(redact_panel)
         rp_layout.setContentsMargins(4, 4, 4, 4)
-        rp_layout.addWidget(QLabel("Redactions"))
+
+        rp_header = QHBoxLayout()
+        rp_header.addWidget(QLabel("Redactions"))
+        self._select_all_btn = QPushButton("Select All")
+        self._select_all_btn.setFixedHeight(24)
+        self._select_all_btn.clicked.connect(self._toggle_select_all)
+        rp_header.addWidget(self._select_all_btn)
+        rp_layout.addLayout(rp_header)
+
         self._redact_list = QListWidget()
         self._redact_list.itemClicked.connect(self._on_redact_item_clicked)
         rp_layout.addWidget(self._redact_list)
-        self._no_redact_label = QLabel("No redactions yet.\nClick Auto Redact.")
+
+        self._no_redact_label = QLabel("No redactions yet.\nClick Regex Redact or AI Redact.")
         self._no_redact_label.setObjectName("subtitleLabel")
         self._no_redact_label.setAlignment(Qt.AlignCenter)
         rp_layout.addWidget(self._no_redact_label)
+
+        self._remove_selected_btn = QPushButton("Remove Selected")
+        self._remove_selected_btn.setObjectName("dangerButton")
+        self._remove_selected_btn.clicked.connect(self._remove_selected_boxes)
+        rp_layout.addWidget(self._remove_selected_btn)
+
         main_splitter.addWidget(redact_panel)
         main_splitter.setSizes([500, 200])
         root.addWidget(main_splitter, 1)
@@ -837,6 +852,8 @@ class PrivacyTab(QWidget):
             else:
                 label += "  Manual box"
             item = QListWidgetItem(label)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(Qt.Unchecked)
             item.setData(Qt.UserRole, i)
             self._redact_list.addItem(item)
 
@@ -845,10 +862,66 @@ class PrivacyTab(QWidget):
         if self._current_file and idx is not None:
             boxes = self._redactions.get(self._current_file, [])
             if 0 <= idx < len(boxes):
-                # Scroll to that page
                 page_num = boxes[idx].page_num
                 if page_num < len(self._page_widgets):
                     self._scroll.ensureWidgetVisible(self._page_widgets[page_num])
+
+    def _toggle_select_all(self):
+        """Toggle Select All / Deselect All."""
+        count = self._redact_list.count()
+        if count == 0:
+            return
+        # Check if all are already checked
+        all_checked = all(
+            self._redact_list.item(i).checkState() == Qt.Checked
+            for i in range(count)
+        )
+        new_state = Qt.Unchecked if all_checked else Qt.Checked
+        for i in range(count):
+            self._redact_list.item(i).setCheckState(new_state)
+        self._select_all_btn.setText("Deselect All" if not all_checked else "Select All")
+
+    def _remove_selected_boxes(self):
+        """Remove all checked redaction boxes. Log corrections for AI boxes."""
+        if not self._current_file:
+            return
+        boxes = self._redactions.get(self._current_file, [])
+        if not boxes:
+            return
+
+        # Collect indices to remove (checked items)
+        indices_to_remove = []
+        for i in range(self._redact_list.count()):
+            item = self._redact_list.item(i)
+            if item.checkState() == Qt.Checked:
+                idx = item.data(Qt.UserRole)
+                if idx is not None:
+                    indices_to_remove.append(idx)
+
+        if not indices_to_remove:
+            return
+
+        # Log corrections for AI boxes being removed
+        doc_type = self._get_doc_type()
+        for idx in indices_to_remove:
+            if 0 <= idx < len(boxes):
+                box = boxes[idx]
+                if box.type == "AI" and box.text:
+                    try:
+                        from src.services.redaction_corrections import log_redaction_correction
+                        log_redaction_correction(doc_type, box.text, "should_not_redact")
+                    except Exception:
+                        pass
+
+        # Remove in reverse order to preserve indices
+        for idx in sorted(indices_to_remove, reverse=True):
+            if 0 <= idx < len(boxes):
+                boxes.pop(idx)
+
+        # Refresh
+        self._select_all_btn.setText("Select All")
+        self._render_file(self._current_file)
+        self._update_redactions_panel()
 
     # ── Save ──
 
