@@ -2,10 +2,134 @@
 Claude Extraction Pack tab — Groq-assisted verbatim extraction for AFCA drafting.
 Accepts drag-and-drop PDFs, generates structured VP1-VP6 Verbatim Pack.
 """
+import json
+import logging
 import os
+import re
 import datetime
+import threading
 from collections import defaultdict
+from pathlib import Path
 from typing import Dict, List, Optional
+
+logger = logging.getLogger(__name__)
+
+# ── Regex patterns for auto-populating matter details ──
+_RE_CLIENT_NAME = re.compile(
+    r'(?:Name|Client|Insured|Customer|Customer\s*Name)'
+    r'\s*:?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)',
+    re.MULTILINE
+)
+_RE_CLIENT_ADDR = re.compile(
+    r'(?:Address|Client\s*Address|Insured\s*Address|Address\s*Details)'
+    r'\s*:?\s*(.+?)(?:\n|$)',
+    re.MULTILINE | re.IGNORECASE
+)
+_RE_DATE_OF_LOSS = re.compile(
+    r'(?:Date\s+of\s+Loss|Loss\s+Date|Date\s+of\s+Incident|Event\s+Date)'
+    r'\s*:?\s*(.+?)(?:\n|$)',
+    re.MULTILINE | re.IGNORECASE
+)
+
+
+def _matter_corrections_path() -> Path:
+    if os.name == "nt":
+        base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+    else:
+        base = Path.home() / ".local" / "share"
+    d = base / "ClaimFileRenamer"
+    d.mkdir(parents=True, exist_ok=True)
+    return d / "matter_corrections.json"
+
+
+def _load_matter_corrections() -> dict:
+    path = _matter_corrections_path()
+    if not path.exists():
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_matter_correction(filename: str, field: str, extracted: str, corrected: str):
+    """Log a matter detail correction asynchronously."""
+    def _write():
+        try:
+            data = _load_matter_corrections()
+            key = os.path.basename(filename)
+            if key not in data:
+                data[key] = {}
+            data[key][field] = {"extracted": extracted, "corrected": corrected}
+            tmp = _matter_corrections_path().with_suffix(".tmp")
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            tmp.replace(_matter_corrections_path())
+            # Sync to GitHub
+            try:
+                from src.services.github_sync import github_sync
+                if github_sync.is_available():
+                    github_sync.upload_corrections(str(_matter_corrections_path()))
+            except Exception:
+                pass
+        except Exception as e:
+            logger.debug("Matter correction save failed: %s", e)
+    threading.Thread(target=_write, daemon=True).start()
+
+
+def _extract_matter_details(file_paths: list) -> dict:
+    """Scan first 2 pages of each PDF to extract client name, address, date of loss."""
+    result = {"client_name": "", "client_addr": "", "date_of_loss": ""}
+    corrections = _load_matter_corrections()
+
+    for fp in file_paths:
+        fn = os.path.basename(fp)
+        # Check corrections first
+        if fn in corrections:
+            corr = corrections[fn]
+            if not result["client_name"] and "client_name" in corr:
+                result["client_name"] = corr["client_name"].get("corrected", "")
+            if not result["client_addr"] and "client_addr" in corr:
+                result["client_addr"] = corr["client_addr"].get("corrected", "")
+            if not result["date_of_loss"] and "date_of_loss" in corr:
+                result["date_of_loss"] = corr["date_of_loss"].get("corrected", "")
+
+        if all(result.values()):
+            break
+
+        try:
+            doc = fitz.open(fp)
+            pages_to_scan = min(2, len(doc))
+            text = ""
+            for i in range(pages_to_scan):
+                text += doc[i].get_text() + "\n"
+            doc.close()
+
+            if not result["client_name"]:
+                m = _RE_CLIENT_NAME.search(text)
+                if m:
+                    result["client_name"] = m.group(1).strip()
+
+            if not result["client_addr"]:
+                m = _RE_CLIENT_ADDR.search(text)
+                if m:
+                    val = m.group(1).strip()
+                    if len(val) >= 5:
+                        result["client_addr"] = val
+
+            if not result["date_of_loss"]:
+                m = _RE_DATE_OF_LOSS.search(text)
+                if m:
+                    result["date_of_loss"] = m.group(1).strip()
+
+        except Exception:
+            continue
+
+        if all(result.values()):
+            break
+
+    return result
 
 import fitz  # PyMuPDF
 
@@ -76,10 +200,12 @@ class ExtractionWorker(QThread):
     finished = Signal(str, dict)
     error = Signal(str)
 
-    def __init__(self, files: list, matter_ref: str, date_of_loss: str, parent=None):
+    def __init__(self, files: list, client_name: str, client_addr: str,
+                 date_of_loss: str, parent=None):
         super().__init__(parent)
         self._files = files
-        self._matter_ref = matter_ref
+        self._client_name = client_name
+        self._client_addr = client_addr
         self._date_of_loss = date_of_loss
 
     def run(self):
@@ -142,7 +268,8 @@ class ExtractionWorker(QThread):
         lines = []
         lines.append("=" * 64)
         lines.append("CLAIMSCO PTY LTD \u2014 VERBATIM PACK")
-        lines.append(f"Matter: {self._matter_ref or '(not specified)'}")
+        lines.append(f"Client: {self._client_name or '(not specified)'}")
+        lines.append(f"Address: {self._client_addr or '(not specified)'}")
         lines.append(f"Date of loss: {self._date_of_loss or '(not specified)'}")
         lines.append(f"Generated: {now.strftime('%d %B %Y %H:%M')}")
         lines.append(f"Documents: {total} | AI-assisted: {ai_count}")
@@ -208,6 +335,7 @@ class ExtractionTab(QWidget):
         self._files: List[str] = []
         self._worker: Optional[ExtractionWorker] = None
         self._pack_text = ""
+        self._auto_populated = {"client_name": "", "client_addr": "", "date_of_loss": ""}
         self._build_ui()
 
     def load_files(self, paths: list):
@@ -259,16 +387,22 @@ class ExtractionTab(QWidget):
         # Matter details (right)
         details = QGroupBox("Matter Details")
         dl = QVBoxLayout(details)
-        mr = QHBoxLayout()
-        mr.addWidget(QLabel("Matter Ref:"))
-        self._matter_edit = QLineEdit()
-        self._matter_edit.setPlaceholderText("MAT-2026-0042")
-        mr.addWidget(self._matter_edit, 1)
-        dl.addLayout(mr)
+        cn = QHBoxLayout()
+        cn.addWidget(QLabel("Client:"))
+        self._client_name_edit = QLineEdit()
+        self._client_name_edit.setPlaceholderText("Auto-populated from documents")
+        cn.addWidget(self._client_name_edit, 1)
+        dl.addLayout(cn)
+        ca = QHBoxLayout()
+        ca.addWidget(QLabel("Address:"))
+        self._client_addr_edit = QLineEdit()
+        self._client_addr_edit.setPlaceholderText("Auto-populated from documents")
+        ca.addWidget(self._client_addr_edit, 1)
+        dl.addLayout(ca)
         dol = QHBoxLayout()
         dol.addWidget(QLabel("Date of Loss:"))
         self._dol_edit = QLineEdit()
-        self._dol_edit.setPlaceholderText("31 October 2024")
+        self._dol_edit.setPlaceholderText("Auto-populated from documents")
         dol.addWidget(self._dol_edit, 1)
         dl.addLayout(dol)
         dl.addStretch()
@@ -345,9 +479,11 @@ class ExtractionTab(QWidget):
         root.addLayout(bottom)
 
     def _add_files(self, paths: list):
+        new_paths = []
         for p in paths:
             if p not in self._files:
                 self._files.append(p)
+                new_paths.append(p)
                 item = QListWidgetItem(os.path.basename(p))
                 item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
                 item.setCheckState(Qt.Unchecked)
@@ -356,6 +492,9 @@ class ExtractionTab(QWidget):
                 self._file_list.addItem(item)
         self._drop_zone.set_count(len(self._files))
         self._gen_btn.setEnabled(bool(self._files))
+        # Auto-populate matter details from newly loaded files
+        if new_paths:
+            self._auto_populate_details()
 
     def _browse_files(self):
         files, _ = QFileDialog.getOpenFileNames(self, "Select PDFs", "", "PDF Files (*.pdf)")
@@ -396,9 +535,41 @@ class ExtractionTab(QWidget):
         self._drop_zone.set_count(len(self._files))
         self._gen_btn.setEnabled(bool(self._files))
 
+    def _auto_populate_details(self):
+        """Scan loaded PDFs to auto-populate Client Name, Address, Date of Loss."""
+        try:
+            details = _extract_matter_details(self._files)
+            if details.get("client_name") and not self._client_name_edit.text().strip():
+                self._client_name_edit.setText(details["client_name"])
+                self._auto_populated["client_name"] = details["client_name"]
+            if details.get("client_addr") and not self._client_addr_edit.text().strip():
+                self._client_addr_edit.setText(details["client_addr"])
+                self._auto_populated["client_addr"] = details["client_addr"]
+            if details.get("date_of_loss") and not self._dol_edit.text().strip():
+                self._dol_edit.setText(details["date_of_loss"])
+                self._auto_populated["date_of_loss"] = details["date_of_loss"]
+        except Exception as e:
+            logger.debug("Auto-populate failed: %s", e)
+
+    def _log_field_corrections(self):
+        """Log corrections if user changed auto-populated values."""
+        if not self._files:
+            return
+        source_file = self._files[0]  # Use first file as reference
+        for field, edit in [
+            ("client_name", self._client_name_edit),
+            ("client_addr", self._client_addr_edit),
+            ("date_of_loss", self._dol_edit),
+        ]:
+            current = edit.text().strip()
+            original = self._auto_populated.get(field, "")
+            if original and current != original:
+                _save_matter_correction(source_file, field, original, current)
+
     def _generate(self):
         if not self._files:
             return
+        self._log_field_corrections()
         self._output.clear()
         self._pack_text = ""
         self._copy_btn.setEnabled(False)
@@ -412,7 +583,9 @@ class ExtractionTab(QWidget):
         self._progress.setVisible(True)
 
         self._worker = ExtractionWorker(
-            self._files, self._matter_edit.text().strip(),
+            self._files,
+            self._client_name_edit.text().strip(),
+            self._client_addr_edit.text().strip(),
             self._dol_edit.text().strip(),
         )
         self._worker.progress.connect(lambda c, t: (
@@ -469,7 +642,7 @@ class ExtractionTab(QWidget):
     def _save(self):
         if not self._pack_text:
             return
-        matter = self._matter_edit.text().strip() or "VerbatimPack"
+        matter = self._client_name_edit.text().strip() or "VerbatimPack"
         path, _ = QFileDialog.getSaveFileName(
             self, "Save Verbatim Pack", f"{matter}_VerbatimPack.txt", "Text Files (*.txt)"
         )
