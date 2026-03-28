@@ -960,6 +960,26 @@
       "fields_corrected": [
         "date"
       ]
+    },
+    {
+      "timestamp": "2026-03-28T17:48:59.741593",
+      "original_filename": "00400625 - Complaint response letter - Decision (AAL).pdf",
+      "text_snippet": " \n \n \n \n \n \n \n \n \n\n \n \n \n \n\n \n \n \n \n\n",
+      "ai_result": {
+        "who": "FF",
+        "entity": "Allianz",
+        "date": "11.11.2025",
+        "what": "No Date"
+      },
+      "corrected_result": {
+        "who": "FF",
+        "entity": "Allianz",
+        "date": "11.11.2025",
+        "what": "IDR FDL"
+      },
+      "fields_corrected": [
+        "what"
+      ]
     }
   ]
 }
