@@ -22,5 +22,11 @@
     "text_fragment": "1800 595 356",
     "action": "should_not_redact",
     "timestamp": "2026-03-28T17:50:28.981034"
+  },
+  {
+    "document_type": "Variation Report",
+    "text_fragment": "1800 595 356",
+    "action": "should_not_redact",
+    "timestamp": "2026-03-28T17:50:30.025074"
   }
 ]
