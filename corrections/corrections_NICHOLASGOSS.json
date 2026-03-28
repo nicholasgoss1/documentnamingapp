@@ -40,5 +40,11 @@
     "text_fragment": "grant@gtek.com.au",
     "action": "should_not_redact",
     "timestamp": "2026-03-28T18:10:04.571243"
+  },
+  {
+    "document_type": "Instructions to GTEK (2)",
+    "text_fragment": "GTEK Infrared",
+    "action": "should_not_redact",
+    "timestamp": "2026-03-28T18:10:06.191984"
   }
 ]
