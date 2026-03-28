@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QProgressBar, QTextEdit, QFileDialog, QGroupBox,
     QMessageBox, QApplication, QFrame, QSplitter,
+    QListWidget, QListWidgetItem,
 )
 
 from src.services.smart_extractor import smart_extractor, VP_SECTIONS
@@ -218,13 +219,44 @@ class ExtractionTab(QWidget):
         root.setContentsMargins(8, 8, 8, 8)
         root.setSpacing(8)
 
-        # Top: drop zone + matter details
+        # Top: drop zone + file list + matter details
         top = QSplitter(Qt.Horizontal)
         self._drop_zone = DropZone()
         self._drop_zone.files_dropped.connect(self._add_files)
         self._drop_zone.clicked.connect(self._browse_files)
         top.addWidget(self._drop_zone)
 
+        # File list panel (middle)
+        file_panel = QWidget()
+        fp_layout = QVBoxLayout(file_panel)
+        fp_layout.setContentsMargins(0, 0, 0, 0)
+        fp_header = QHBoxLayout()
+        fp_header.addWidget(QLabel("Files"))
+        self._files_select_btn = QPushButton("\u2611 All")
+        self._files_select_btn.setFixedHeight(24)
+        self._files_select_btn.setFixedWidth(50)
+        self._files_select_btn.clicked.connect(self._toggle_files_select)
+        fp_header.addWidget(self._files_select_btn)
+        remove_btn = QPushButton("Remove Sel.")
+        remove_btn.setFixedHeight(24)
+        remove_btn.clicked.connect(self._remove_selected_files)
+        fp_header.addWidget(remove_btn)
+        fp_layout.addLayout(fp_header)
+        self._file_list = QListWidget()
+        self._file_list.setStyleSheet("""
+            QListWidget::indicator {
+                width: 14px; height: 14px;
+                border: 2px solid #89b4fa; border-radius: 2px;
+                background: #313244;
+            }
+            QListWidget::indicator:checked {
+                background: #89b4fa; border-color: #89b4fa;
+            }
+        """)
+        fp_layout.addWidget(self._file_list)
+        top.addWidget(file_panel)
+
+        # Matter details (right)
         details = QGroupBox("Matter Details")
         dl = QVBoxLayout(details)
         mr = QHBoxLayout()
@@ -241,7 +273,7 @@ class ExtractionTab(QWidget):
         dl.addLayout(dol)
         dl.addStretch()
         top.addWidget(details)
-        top.setSizes([350, 250])
+        top.setSizes([250, 200, 200])
         root.addWidget(top)
 
         # Generate button + progress
@@ -316,6 +348,12 @@ class ExtractionTab(QWidget):
         for p in paths:
             if p not in self._files:
                 self._files.append(p)
+                item = QListWidgetItem(os.path.basename(p))
+                item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+                item.setCheckState(Qt.Unchecked)
+                item.setData(Qt.UserRole, p)
+                item.setToolTip(p)
+                self._file_list.addItem(item)
         self._drop_zone.set_count(len(self._files))
         self._gen_btn.setEnabled(bool(self._files))
 
@@ -323,6 +361,40 @@ class ExtractionTab(QWidget):
         files, _ = QFileDialog.getOpenFileNames(self, "Select PDFs", "", "PDF Files (*.pdf)")
         if files:
             self._add_files(files)
+
+    def _toggle_files_select(self):
+        count = self._file_list.count()
+        if count == 0:
+            return
+        all_checked = all(
+            self._file_list.item(i).checkState() == Qt.Checked for i in range(count)
+        )
+        new_state = Qt.Unchecked if all_checked else Qt.Checked
+        for i in range(count):
+            self._file_list.item(i).setCheckState(new_state)
+        self._files_select_btn.setText("\u2610 All" if not all_checked else "\u2611 All")
+
+    def _remove_selected_files(self):
+        to_remove = []
+        for i in range(self._file_list.count()):
+            item = self._file_list.item(i)
+            if item and item.checkState() == Qt.Checked:
+                to_remove.append(item.data(Qt.UserRole))
+        if not to_remove:
+            return
+        for path in to_remove:
+            if path in self._files:
+                self._files.remove(path)
+        self._file_list.clear()
+        for p in self._files:
+            item = QListWidgetItem(os.path.basename(p))
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(Qt.Unchecked)
+            item.setData(Qt.UserRole, p)
+            item.setToolTip(p)
+            self._file_list.addItem(item)
+        self._drop_zone.set_count(len(self._files))
+        self._gen_btn.setEnabled(bool(self._files))
 
     def _generate(self):
         if not self._files:

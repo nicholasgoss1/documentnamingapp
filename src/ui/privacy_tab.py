@@ -473,11 +473,31 @@ class PrivacyTab(QWidget):
         fp_layout.setContentsMargins(0, 0, 0, 0)
         fp_header = QHBoxLayout()
         fp_header.addWidget(QLabel("Files"))
+        self._files_select_all_btn = QPushButton("\u2611 All")
+        self._files_select_all_btn.setFixedHeight(24)
+        self._files_select_all_btn.setFixedWidth(50)
+        self._files_select_all_btn.clicked.connect(self._toggle_files_select_all)
+        fp_header.addWidget(self._files_select_all_btn)
+        remove_sel_btn = QPushButton("Remove Sel.")
+        remove_sel_btn.setFixedHeight(24)
+        remove_sel_btn.clicked.connect(self._remove_selected_files)
+        fp_header.addWidget(remove_sel_btn)
         clear_btn = QPushButton("Clear All")
+        clear_btn.setFixedHeight(24)
         clear_btn.clicked.connect(self._clear_files)
         fp_header.addWidget(clear_btn)
         fp_layout.addLayout(fp_header)
         self._file_list = QListWidget()
+        self._file_list.setStyleSheet("""
+            QListWidget::indicator {
+                width: 14px; height: 14px;
+                border: 2px solid #89b4fa; border-radius: 2px;
+                background: #313244;
+            }
+            QListWidget::indicator:checked {
+                background: #89b4fa; border-color: #89b4fa;
+            }
+        """)
         self._file_list.currentRowChanged.connect(self._on_file_selected)
         fp_layout.addWidget(self._file_list)
         top_splitter.addWidget(file_panel)
@@ -617,6 +637,8 @@ class PrivacyTab(QWidget):
             if p not in self._files:
                 self._files.append(p)
                 item = QListWidgetItem(os.path.basename(p))
+                item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+                item.setCheckState(Qt.Unchecked)
                 item.setData(Qt.UserRole, p)
                 item.setToolTip(p)
                 self._file_list.addItem(item)
@@ -634,6 +656,49 @@ class PrivacyTab(QWidget):
         self._current_file = None
         self._clear_viewer()
         self._drop_zone.set_count(0)
+        self._send_btn.setEnabled(False)
+
+    def _toggle_files_select_all(self):
+        count = self._file_list.count()
+        if count == 0:
+            return
+        all_checked = all(
+            self._file_list.item(i).checkState() == Qt.Checked for i in range(count)
+        )
+        new_state = Qt.Unchecked if all_checked else Qt.Checked
+        for i in range(count):
+            self._file_list.item(i).setCheckState(new_state)
+        self._files_select_all_btn.setText("\u2610 All" if not all_checked else "\u2611 All")
+
+    def _remove_selected_files(self):
+        to_remove = []
+        for i in range(self._file_list.count()):
+            item = self._file_list.item(i)
+            if item and item.checkState() == Qt.Checked:
+                to_remove.append(item.data(Qt.UserRole))
+        if not to_remove:
+            return
+        for path in to_remove:
+            if path in self._files:
+                self._files.remove(path)
+            self._redactions.pop(path, None)
+        # If current file was removed, clear preview
+        if self._current_file in to_remove:
+            self._current_file = None
+            self._clear_viewer()
+        # Rebuild file list widget
+        self._file_list.clear()
+        for p in self._files:
+            item = QListWidgetItem(os.path.basename(p))
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(Qt.Unchecked)
+            item.setData(Qt.UserRole, p)
+            item.setToolTip(p)
+            self._file_list.addItem(item)
+        self._drop_zone.set_count(len(self._files))
+        self._send_btn.setEnabled(bool(self._files))
+        if self._files and not self._current_file:
+            self._file_list.setCurrentRow(0)
 
     def _browse_files(self):
         files, _ = QFileDialog.getOpenFileNames(

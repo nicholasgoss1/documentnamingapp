@@ -12,7 +12,7 @@ from src.core.models import DocumentRecord, RenameStatus, DuplicateStatus
 
 logger = logging.getLogger(__name__)
 
-_COL_TO_FIELD = {1: "who", 2: "date", 3: "entity", 4: "what"}
+_COL_TO_FIELD = {1: "who", 2: "date", 3: "entity", 4: "what", 8: "duplicate"}
 
 COLUMNS = [
     "Original Filename",
@@ -27,7 +27,7 @@ COLUMNS = [
     "Status",
 ]
 
-EDITABLE_COLUMNS = {1, 2, 3, 4}  # WHO, DATE, ENTITY, WHAT
+EDITABLE_COLUMNS = {1, 2, 3, 4, 8}  # WHO, DATE, ENTITY, WHAT, Duplicate
 
 
 def _rebuild_filename(rec: DocumentRecord):
@@ -158,6 +158,8 @@ class DocumentTableModel(QAbstractTableModel):
             old_value = rec.entity
         elif col == 4:
             old_value = rec.what
+        elif col == 8:
+            old_value = rec.duplicate_status.value if rec.duplicate_status else "None"
 
         if col == 1:
             rec.who = value
@@ -167,6 +169,14 @@ class DocumentTableModel(QAbstractTableModel):
             rec.entity = value
         elif col == 4:
             rec.what = value
+        elif col == 8:
+            _DUP_MAP = {
+                "none": DuplicateStatus.NONE,
+                "exact duplicate": DuplicateStatus.EXACT_DUPLICATE,
+                "near duplicate": DuplicateStatus.LIKELY_DUPLICATE,
+                "likely duplicate": DuplicateStatus.LIKELY_DUPLICATE,
+            }
+            rec.duplicate_status = _DUP_MAP.get(value.lower(), DuplicateStatus.NONE)
         else:
             return False
 
@@ -174,6 +184,7 @@ class DocumentTableModel(QAbstractTableModel):
         if field_name and value != old_value:
             try:
                 from src.services.corrections_store import log_correction
+                dup_val = rec.duplicate_status.value if rec.duplicate_status else "None"
                 log_correction(
                     original_filename=rec.original_filename,
                     text_snippet=rec.extracted_text[:200] if rec.extracted_text else "",
@@ -182,10 +193,12 @@ class DocumentTableModel(QAbstractTableModel):
                         "entity": rec.entity if col != 3 else old_value,
                         "date": rec.date if col != 2 else old_value,
                         "what": rec.what if col != 4 else old_value,
+                        "duplicate": old_value if col == 8 else dup_val,
                     },
                     corrected_result={
                         "who": rec.who, "entity": rec.entity,
                         "date": rec.date, "what": rec.what,
+                        "duplicate": dup_val,
                     },
                     fields_corrected=[field_name],
                 )
@@ -193,8 +206,9 @@ class DocumentTableModel(QAbstractTableModel):
             except Exception as e:
                 logger.debug("Failed to log correction: %s", e)
 
-        # Manual edit overrides duplicate detection — rebuild from fields
-        rec.duplicate_status = DuplicateStatus.NONE
+        # Manual edit overrides duplicate detection (except when editing duplicate itself)
+        if col != 8:
+            rec.duplicate_status = DuplicateStatus.NONE
         _rebuild_filename(rec)
         # Emit change for the whole row
         self.dataChanged.emit(
