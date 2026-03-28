@@ -58,5 +58,11 @@
     "text_fragment": "GTEK Infrared",
     "action": "should_not_redact",
     "timestamp": "2026-03-28T18:10:08.391436"
+  },
+  {
+    "document_type": "Instructions to GTEK (2)",
+    "text_fragment": "ClaimsCo Pty Ltd",
+    "action": "should_not_redact",
+    "timestamp": "2026-03-28T18:10:09.473488"
   }
 ]
