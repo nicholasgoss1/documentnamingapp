@@ -1,7 +1,15 @@
-# ClaimsCo Document Tools v2.0
+# ClaimsCo Document Tools
 
 A local-first Windows desktop app for insurance claim document processing.
-All processing happens on your machine — no data leaves the device unless Groq AI classification is enabled.
+
+## Download
+
+**Latest installer (always up to date):**
+https://github.com/nicholasgoss1/documentnamingapp/releases/latest/download/ClaimsCo_Tools_Setup_latest.exe
+
+Existing staff: you do not need to re-download for AI improvements.
+These are delivered silently every time you open the app.
+Only download again if the app shows "App update available" in the status bar.
 
 ---
 

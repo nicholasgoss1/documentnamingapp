@@ -1,16 +1,20 @@
 """
-Automatic daily harvest of corrections from GitHub sync branch.
+Automatic harvest of corrections from GitHub sync branch.
 Downloads all staff corrections, merges them, and updates learned examples.
+Also checks for app updates via GitHub releases.
 """
 import json
 import logging
 import os
 import shutil
 import tempfile
-from datetime import date
+import time
+from datetime import date, datetime
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+_HARVEST_INTERVAL_SECONDS = 4 * 3600  # 4 hours
 
 
 def _app_data_dir() -> Path:
@@ -23,17 +27,53 @@ def _app_data_dir() -> Path:
     return d
 
 
+def check_for_app_update():
+    """Check if a new APP version (code change) is available.
+    Returns (version_string, download_url) or None.
+    AI-only releases (tagged -ai-update) are ignored.
+    """
+    try:
+        import urllib.request
+        from src.core.settings import APP_VERSION
+
+        url = ("https://api.github.com/repos/"
+               "nicholasgoss1/documentnamingapp/releases/latest")
+        req = urllib.request.Request(url, headers={"User-Agent": "ClaimsCo-App"})
+        with urllib.request.urlopen(req, timeout=5) as r:
+            data = json.loads(r.read())
+
+        tag = data.get("tag_name", "")
+        if "-ai-" in tag or "-seeds-" in tag:
+            return None
+
+        release_version = tag.lstrip("v").split("-")[0]
+        if release_version and release_version != APP_VERSION:
+            download_url = (
+                "https://github.com/nicholasgoss1/documentnamingapp/"
+                "releases/latest/download/ClaimsCo_Tools_Setup_latest.exe"
+            )
+            return (release_version, download_url)
+        return None
+    except Exception:
+        return None
+
+
 class AutoHarvester:
 
-    def should_run_today(self) -> bool:
+    def should_run_this_session(self) -> bool:
+        """Return True if last harvest was more than 4 hours ago."""
         ts_file = _app_data_dir() / "last_harvest.txt"
         if not ts_file.exists():
             return True
         try:
-            last = ts_file.read_text().strip()
-            return last != date.today().isoformat()
-        except Exception:
+            last_ts = float(ts_file.read_text().strip())
+            return (time.time() - last_ts) > _HARVEST_INTERVAL_SECONDS
+        except (ValueError, OSError):
             return True
+
+    # Keep old method as alias for backwards compat
+    def should_run_today(self) -> bool:
+        return self.should_run_this_session()
 
     def run_harvest(self) -> dict:
         result = {"files_read": 0, "new_examples": 0, "total_examples": 0, "ran_at": ""}
@@ -136,11 +176,10 @@ class AutoHarvester:
                 except Exception as e:
                     logger.debug("Could not update seed_examples.py: %s", e)
 
-            # Record harvest date
+            # Record harvest timestamp (epoch seconds for 4-hour check)
             ts_file = _app_data_dir() / "last_harvest.txt"
-            today_str = date.today().isoformat()
-            ts_file.write_text(today_str)
-            result["ran_at"] = today_str
+            ts_file.write_text(str(time.time()))
+            result["ran_at"] = datetime.now().isoformat()
 
             # Clean up temp dir (but not local corrections)
             try:

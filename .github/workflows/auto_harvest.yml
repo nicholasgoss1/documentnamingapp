@@ -1,0 +1,99 @@
+name: Auto Harvest Corrections
+
+on:
+  push:
+    branches:
+      - corrections-sync
+    paths:
+      - 'corrections/corrections_*.json'
+
+jobs:
+  harvest:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout working branch
+        uses: actions/checkout@v4
+        with:
+          ref: claimsco-documents-manager
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download corrections from corrections-sync
+        run: |
+          git fetch origin corrections-sync
+          mkdir -p /tmp/corrections
+          git ls-tree -r --name-only origin/corrections-sync corrections/ 2>/dev/null | while read f; do
+            git show "origin/corrections-sync:$f" > "/tmp/corrections/$(basename $f)" 2>/dev/null || true
+          done
+          echo "Files in /tmp/corrections:"
+          ls /tmp/corrections/ || echo "None found"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run harvest and update seeds
+        run: |
+          python << 'PYEOF'
+          import json, os
+          from pathlib import Path
+          from datetime import datetime
+
+          corrections_dir = Path('/tmp/corrections')
+          seed_file = Path('src/services/seed_examples.py')
+
+          all_corrections = []
+          for f in corrections_dir.glob('corrections_*.json'):
+              try:
+                  data = json.loads(f.read_text())
+                  all_corrections.extend(data.get('corrections', []))
+                  print(f'Loaded {len(data.get("corrections",[]))} from {f.name}')
+              except Exception as e:
+                  print(f'Skipping {f.name}: {e}')
+
+          print(f'Total corrections: {len(all_corrections)}')
+          genuine = [c for c in all_corrections if c.get('fields_corrected')]
+          print(f'Genuine corrections: {len(genuine)}')
+
+          seed_content = seed_file.read_text()
+          namespace = {}
+          exec(seed_content, namespace)
+          existing = {e['filename']: e for e in namespace.get('SEED_EXAMPLES', [])}
+          print(f'Existing seeds: {len(existing)}')
+
+          new_count = 0
+          for c in genuine:
+              fname = c.get('original_filename', '')
+              result = c.get('corrected_result', {})
+              if not fname or not result:
+                  continue
+              if all(result.get(k) for k in ['who', 'entity', 'date', 'what']):
+                  if fname not in existing:
+                      existing[fname] = {'filename': fname, 'result': result}
+                      new_count += 1
+                  else:
+                      existing[fname]['result'] = result
+
+          print(f'New examples added: {new_count}')
+          examples = list(existing.values())[:50]
+
+          output = (
+              '# Auto-updated by GitHub Actions harvest\n'
+              f'# Updated: {datetime.utcnow().isoformat()}Z\n'
+              f'# Total examples: {len(examples)}\n\n'
+              f'SEED_EXAMPLES = {json.dumps(examples, indent=4)}\n'
+          )
+          seed_file.write_text(output)
+          print(f'Written {len(examples)} examples to seed_examples.py')
+          PYEOF
+
+      - name: Commit updated seeds
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "GitHub Actions Bot"
+          git add src/services/seed_examples.py
+          git diff --cached --quiet && echo "No changes to commit" || git commit -m "auto: update seed examples from corrections [skip ci]"
+          git push origin claimsco-documents-manager

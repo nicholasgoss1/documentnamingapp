@@ -9,7 +9,7 @@ import logging
 import threading
 from typing import List
 
-from PySide6.QtCore import Qt, QModelIndex
+from PySide6.QtCore import Qt, QModelIndex, Slot
 from PySide6.QtGui import QAction, QDragEnterEvent, QDropEvent, QPixmap
 try:
     from PySide6.QtSvgWidgets import QSvgWidget
@@ -59,6 +59,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.settings = settings
         self._worker = None
+        self._pending_update = None
         self.setWindowTitle(f"ClaimsCo Document Tools v{APP_VERSION}")
         self.setMinimumSize(1280, 720)
         self.setAcceptDrops(True)
@@ -695,6 +696,29 @@ class MainWindow(QMainWindow):
     def _update_corrections_count(self):
         self._corr_label.setText(self._corrections_text())
 
+    # ── App close — final corrections sync ──
+
+    def closeEvent(self, event):
+        try:
+            from src.services.github_sync import github_sync
+            from src.services.corrections_store import _corrections_path
+            if github_sync.is_available():
+                cp = _corrections_path()
+                if cp.exists():
+                    done = threading.Event()
+                    def _final_sync():
+                        try:
+                            github_sync.upload_corrections(str(cp))
+                        except Exception:
+                            pass
+                        done.set()
+                    t = threading.Thread(target=_final_sync, daemon=True)
+                    t.start()
+                    done.wait(timeout=5)
+        except Exception:
+            pass
+        event.accept()
+
     # ── Background startup tasks ──
 
     def _run_startup_tasks(self):
@@ -708,17 +732,50 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
 
-            # Auto-harvest (once per day, after 30s delay from startup)
+            # Auto-harvest (every 4 hours)
             import time
             time.sleep(25)  # Total ~30s after the 5s QTimer delay
             try:
                 from src.services.github_sync import github_sync
                 from src.services.auto_harvest import auto_harvester
-                if github_sync.is_available() and auto_harvester.should_run_today():
+                if github_sync.is_available() and auto_harvester.should_run_this_session():
                     auto_harvester.run_harvest()
                     logger.debug("Auto-harvest completed")
             except Exception as e:
                 logger.debug("Auto-harvest failed: %s", e)
 
+            # Check for app updates (not AI-only updates)
+            try:
+                from src.services.auto_harvest import check_for_app_update
+                update = check_for_app_update()
+                if update:
+                    version, url = update
+                    self._pending_update = (version, url)
+                    # Schedule UI update on main thread
+                    from PySide6.QtCore import QMetaObject, Qt as QtNS
+                    QMetaObject.invokeMethod(
+                        self, "_show_update_notification",
+                        QtNS.QueuedConnection
+                    )
+            except Exception:
+                pass
+
         thread = threading.Thread(target=_tasks, daemon=True)
         thread.start()
+
+    @Slot()
+    def _show_update_notification(self):
+        """Called on main thread to show update notification in status bar."""
+        try:
+            version, url = self._pending_update
+            update_label = QLabel(
+                f"\u2b06 App update v{version} available \u2014 click to download"
+            )
+            update_label.setCursor(Qt.PointingHandCursor)
+            update_label.setStyleSheet(
+                "color: #f9e2af; padding: 2px 8px; font-weight: bold;"
+            )
+            update_label.mousePressEvent = lambda _: __import__('webbrowser').open(url)
+            self.statusBar().addPermanentWidget(update_label)
+        except Exception:
+            pass

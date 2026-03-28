@@ -1,0 +1,137 @@
+name: Build and Release Installer
+
+on:
+  push:
+    branches:
+      - claimsco-documents-manager
+    paths:
+      - 'src/**/*.py'
+      - 'build.spec'
+  workflow_dispatch:
+    inputs:
+      force_app_release:
+        description: 'Force as app release (not AI-only)'
+        required: false
+        default: 'false'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: claimsco-documents-manager
+
+      - name: Determine release type
+        id: release_type
+        shell: pwsh
+        run: |
+          $changed = git diff --name-only HEAD~1 HEAD 2>$null
+          $aiOnly = $true
+          foreach ($file in $changed) {
+            if ($file -ne "src/services/seed_examples.py") {
+              $aiOnly = $false
+              break
+            }
+          }
+          if ("${{ github.event.inputs.force_app_release }}" -eq "true") {
+            $aiOnly = $false
+          }
+          echo "ai_only=$aiOnly" >> $env:GITHUB_OUTPUT
+          echo "Release type: $(if ($aiOnly) {'AI update'} else {'App update'})"
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Write Groq API key
+        shell: pwsh
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          if ($env:GROQ_API_KEY) {
+            $keyFile = "src/services/.groq_key"
+            Set-Content $keyFile $env:GROQ_API_KEY
+            Write-Output "Groq key written to .groq_key"
+          } else {
+            Write-Output "No GROQ_API_KEY secret set"
+          }
+
+      - name: Write GitHub sync token
+        shell: pwsh
+        env:
+          SYNC_TOKEN: ${{ secrets.SYNC_TOKEN }}
+        run: |
+          if ($env:SYNC_TOKEN) {
+            New-Item -Path "C:/Projects" -ItemType Directory -Force | Out-Null
+            Set-Content "C:/Projects/GitHub sync token.txt" $env:SYNC_TOKEN
+            Write-Output "Sync token written"
+          } else {
+            Write-Output "No SYNC_TOKEN secret set"
+          }
+
+      - name: Build with PyInstaller
+        run: python -m PyInstaller build.spec --clean --noconfirm
+
+      - name: Install Inno Setup
+        run: choco install innosetup --yes --no-progress
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          & "C:/Program Files (x86)/Inno Setup 6/ISCC.exe" packaging/installer.iss
+          $files = Get-ChildItem installer_output/*.exe
+          foreach ($f in $files) {
+            Copy-Item $f.FullName "installer_output/ClaimsCo_Tools_Setup_latest.exe"
+          }
+          Write-Output "Installer built successfully"
+
+      - name: Get version
+        id: version
+        shell: pwsh
+        run: |
+          $v = python -c "from src.core.settings import APP_VERSION; print(APP_VERSION)"
+          echo "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Create App Release (code changed)
+        if: steps.release_type.outputs.ai_only == 'False'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: ClaimsCo Document Tools v${{ steps.version.outputs.version }}
+          body: |
+            ## App Update
+            This release contains code changes.
+            Existing staff should download this update.
+
+            **Download:** [ClaimsCo_Tools_Setup_latest.exe](https://github.com/nicholasgoss1/documentnamingapp/releases/latest/download/ClaimsCo_Tools_Setup_latest.exe)
+          files: |
+            installer_output/ClaimsCo_Tools_Setup_latest.exe
+          token: ${{ secrets.GITHUB_TOKEN }}
+          make_latest: true
+
+      - name: Create AI Release (seeds only)
+        if: steps.release_type.outputs.ai_only == 'True'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}-ai-update-${{ github.run_number }}
+          name: AI Improvement Update (v${{ steps.version.outputs.version }})
+          body: |
+            ## AI Improvement Release
+            This release contains updated AI examples only.
+            Existing staff do NOT need to download — improvements are delivered silently via the learning loop.
+            New installs will include these improvements automatically.
+          files: |
+            installer_output/ClaimsCo_Tools_Setup_latest.exe
+          token: ${{ secrets.GITHUB_TOKEN }}
+          make_latest: false
