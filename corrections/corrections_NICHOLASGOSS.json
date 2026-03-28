@@ -800,6 +800,26 @@
       "fields_corrected": [
         "what"
       ]
+    },
+    {
+      "timestamp": "2026-03-28T17:47:08.772277",
+      "original_filename": "2c. FF - 25.05.2025 - PB EZY Projects Site Report.pdf",
+      "text_snippet": " \n \n \n \n \nBUILDERS SITE REPORT\n \n24/05/2025 \n \nEZ18354-CF46611 EP Site Report\n \nInsured Details\nInsured Name\nJan Norma Hall\nSite Address\n37 Dangar Street, Armidale\nInsurer\nAllianz Partners - ENData\n \n",
+      "ai_result": {
+        "who": "FF",
+        "entity": "PB EZY Projects Site Report",
+        "date": "24.05.2025",
+        "what": "Site Report"
+      },
+      "corrected_result": {
+        "who": "FF",
+        "entity": "EZY Projects",
+        "date": "24.05.2025",
+        "what": "Site Report"
+      },
+      "fields_corrected": [
+        "entity"
+      ]
     }
   ]
 }
