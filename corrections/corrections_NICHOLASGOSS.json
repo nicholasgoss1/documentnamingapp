@@ -300,6 +300,26 @@
       "fields_corrected": [
         "what"
       ]
+    },
+    {
+      "timestamp": "2026-03-28T17:40:26.183621",
+      "original_filename": "Live Electrical - Solar Report - Jan Hall - 37 Dangar Street, Armidale NSW.pdf",
+      "text_snippet": "Live Electrical and Air Conditioning will get to you when no one else can.\nProviding some of the highest quality and fastest service in the industry, Live Electrical and Air Conditioning’s large team ",
+      "ai_result": {
+        "who": "FF",
+        "entity": "Jan Hall",
+        "date": "15.05.2025",
+        "what": "Solar PV Specialist Report"
+      },
+      "corrected_result": {
+        "who": "FF",
+        "entity": "Live Electrical & Air Conditioning",
+        "date": "15.05.2025",
+        "what": "Solar PV Specialist Report"
+      },
+      "fields_corrected": [
+        "entity"
+      ]
     }
   ]
 }
