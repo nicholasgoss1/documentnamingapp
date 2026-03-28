@@ -140,7 +140,7 @@ class GroqClassifier:
                 text=text[:1200], filename=filename, few_shot_examples=few_shot
             )
             response = client.chat.completions.create(
-                model="llama-3.1-8b-instant",
+                model="llama-3.3-70b-versatile",
                 messages=[
                     {"role": "system", "content": _SYSTEM_PROMPT},
                     {"role": "user", "content": user_prompt}

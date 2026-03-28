@@ -111,7 +111,7 @@ def _groq_call(system_prompt: str, user_prompt: str, timeout: int = 15) -> Optio
         for attempt in range(2):
             try:
                 response = client.chat.completions.create(
-                    model="llama-3.1-8b-instant",
+                    model="llama-3.3-70b-versatile",
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},

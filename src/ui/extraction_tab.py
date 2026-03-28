@@ -15,19 +15,21 @@ from typing import Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 # ── Regex patterns for auto-populating matter details ──
+# Name: captures value on same line only, stops at newline
 _RE_CLIENT_NAME = re.compile(
-    r'(?:Name|Client|Insured|Customer|Customer\s*Name)'
-    r'\s*:?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)',
-    re.MULTILINE
+    r'(?:(?:Client\s*)?Name|Client|Insured(?:\s*Name)?|Customer(?:\s*Name)?)'
+    r'\s*:\s*([^\n:]+)',
+    re.MULTILINE | re.IGNORECASE
 )
 _RE_CLIENT_ADDR = re.compile(
-    r'(?:Address|Client\s*Address|Insured\s*Address|Address\s*Details)'
-    r'\s*:?\s*(.+?)(?:\n|$)',
+    r'(?:(?:Client\s*|Insured\s*)?Address(?:\s*Details)?)'
+    r'\s*:\s*([^\n]+)',
     re.MULTILINE | re.IGNORECASE
 )
 _RE_DATE_OF_LOSS = re.compile(
-    r'(?:Date\s+of\s+Loss|Loss\s+Date|Date\s+of\s+Incident|Event\s+Date)'
-    r'\s*:?\s*(.+?)(?:\n|$)',
+    r'(?:Date\s+of\s+Loss|Loss\s+Date|Date\s+of\s+Incident|'
+    r'Event\s+Date|Claim\s+Date|Date\s+of\s+Event)'
+    r'\s*:\s*([^\n]+)',
     re.MULTILINE | re.IGNORECASE
 )
 
@@ -54,19 +56,25 @@ def _load_matter_corrections() -> dict:
 
 
 def _save_matter_correction(filename: str, field: str, extracted: str, corrected: str):
-    """Log a matter detail correction asynchronously."""
+    """Log a matter detail correction — both by filename and by extracted value."""
     def _write():
         try:
             data = _load_matter_corrections()
+            # Store by filename
             key = os.path.basename(filename)
             if key not in data:
                 data[key] = {}
             data[key][field] = {"extracted": extracted, "corrected": corrected}
+            # Store by extracted value (global learning)
+            if extracted:
+                vk = f"_value_correction_{field}"
+                if vk not in data:
+                    data[vk] = {}
+                data[vk][extracted] = corrected
             tmp = _matter_corrections_path().with_suffix(".tmp")
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
             tmp.replace(_matter_corrections_path())
-            # Sync to GitHub
             try:
                 from src.services.github_sync import github_sync
                 if github_sync.is_available():
@@ -78,38 +86,84 @@ def _save_matter_correction(filename: str, field: str, extracted: str, corrected
     threading.Thread(target=_write, daemon=True).start()
 
 
+def _apply_value_corrections(result: dict, corrections: dict):
+    """Apply global value-based corrections (learned bad extractions)."""
+    for field in ["client_name", "client_addr", "date_of_loss"]:
+        vk = f"_value_correction_{field}"
+        if vk in corrections and result.get(field):
+            bad_val = result[field]
+            if bad_val in corrections[vk]:
+                result[field] = corrections[vk][bad_val]
+
+
+def _groq_extract_details(text: str) -> dict:
+    """Groq fallback for extracting client name, address, date of loss."""
+    try:
+        from src.services.ai_classifier import _GROQ_API_KEY
+        if not _GROQ_API_KEY or not _GROQ_API_KEY.startswith("gsk_"):
+            return {}
+        from groq import Groq
+        client = Groq(api_key=_GROQ_API_KEY)
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": (
+                    "Extract client details from this Australian insurance document. "
+                    "Return ONLY a JSON object with keys: client_name, client_address, "
+                    "date_of_loss. Use exact text from the document. "
+                    "If not found, use empty string."
+                )},
+                {"role": "user", "content": f"Extract details:\n\n{text[:2000]}"},
+            ],
+            response_format={"type": "json_object"},
+            timeout=8,
+        )
+        r = json.loads(response.choices[0].message.content)
+        return {
+            "client_name": r.get("client_name", "").strip(),
+            "client_addr": r.get("client_address", "").strip(),
+            "date_of_loss": r.get("date_of_loss", "").strip(),
+        }
+    except Exception as e:
+        logger.debug("Groq matter extraction failed: %s", e)
+        return {}
+
+
 def _extract_matter_details(file_paths: list) -> dict:
     """Scan first 2 pages of each PDF to extract client name, address, date of loss."""
     result = {"client_name": "", "client_addr": "", "date_of_loss": ""}
     corrections = _load_matter_corrections()
+    best_text = ""  # Track most content-rich text for Groq fallback
 
     for fp in file_paths:
         fn = os.path.basename(fp)
-        # Check corrections first
+        # Check filename-keyed corrections first
         if fn in corrections:
             corr = corrections[fn]
-            if not result["client_name"] and "client_name" in corr:
-                result["client_name"] = corr["client_name"].get("corrected", "")
-            if not result["client_addr"] and "client_addr" in corr:
-                result["client_addr"] = corr["client_addr"].get("corrected", "")
-            if not result["date_of_loss"] and "date_of_loss" in corr:
-                result["date_of_loss"] = corr["date_of_loss"].get("corrected", "")
+            for field in ["client_name", "client_addr", "date_of_loss"]:
+                if not result[field] and field in corr:
+                    result[field] = corr[field].get("corrected", "")
 
         if all(result.values()):
             break
 
         try:
             doc = fitz.open(fp)
-            pages_to_scan = min(2, len(doc))
             text = ""
-            for i in range(pages_to_scan):
+            for i in range(min(2, len(doc))):
                 text += doc[i].get_text() + "\n"
             doc.close()
+
+            if len(text) > len(best_text):
+                best_text = text
 
             if not result["client_name"]:
                 m = _RE_CLIENT_NAME.search(text)
                 if m:
-                    result["client_name"] = m.group(1).strip()
+                    val = m.group(1).strip()
+                    # Reject if too short or looks like a label
+                    if len(val) >= 3 and not val.lower().startswith("address"):
+                        result["client_name"] = val
 
             if not result["client_addr"]:
                 m = _RE_CLIENT_ADDR.search(text)
@@ -122,12 +176,24 @@ def _extract_matter_details(file_paths: list) -> dict:
                 m = _RE_DATE_OF_LOSS.search(text)
                 if m:
                     result["date_of_loss"] = m.group(1).strip()
-
         except Exception:
             continue
 
         if all(result.values()):
             break
+
+    # Groq fallback for any missing fields
+    if not all(result.values()) and best_text:
+        try:
+            groq_result = _groq_extract_details(best_text)
+            for field in ["client_name", "client_addr", "date_of_loss"]:
+                if not result[field] and groq_result.get(field):
+                    result[field] = groq_result[field]
+        except Exception:
+            pass
+
+    # Apply global value-based corrections (learned bad extractions)
+    _apply_value_corrections(result, corrections)
 
     return result
 

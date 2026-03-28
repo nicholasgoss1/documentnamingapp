@@ -53,7 +53,7 @@ def _detect_pii_with_groq(text: str, few_shot_block: str = "") -> list:
             system_content += "\n\n" + few_shot_block
 
         response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system", "content": system_content},
                 {"role": "user", "content": f"Find all PII:\n\n{text[:3000]}"},

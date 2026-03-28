@@ -38,7 +38,7 @@ class GroqRedactor:
                 from src.services.ai_classifier import _GROQ_API_KEY
                 client = Groq(api_key=_GROQ_API_KEY)
                 response = client.chat.completions.create(
-                    model="llama-3.1-8b-instant",
+                    model="llama-3.3-70b-versatile",
                     messages=[
                         {"role": "system", "content": _SYSTEM_PROMPT},
                         {"role": "user", "content": batch_text}

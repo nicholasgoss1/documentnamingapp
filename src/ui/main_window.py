@@ -46,7 +46,7 @@ def _ai_status_text() -> str:
     try:
         from src.services.ai_classifier import groq_classifier
         if groq_classifier.is_available():
-            return "AI: Groq (llama-3.1-8b-instant) \u2713"
+            return "AI: Groq (llama-3.3-70b-versatile) \u2713"
     except Exception:
         pass
     return "AI: Offline (rule-based only)"

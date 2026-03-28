@@ -132,7 +132,7 @@ class SettingsDialog(QDialog):
         status_label = QLabel(status_text)
         status_label.setObjectName("subtitleLabel")
         ai_form.addRow("Status:", status_label)
-        ai_form.addRow("Model:", QLabel("llama-3.1-8b-instant"))
+        ai_form.addRow("Model:", QLabel("llama-3.3-70b-versatile"))
         ai_form.addRow("Limit:", QLabel("14,400 classifications per day (shared across all users)"))
         ai_form.addRow("Trigger:", QLabel("Only called when confidence < 85%"))
         ai_form.addRow("Fallback:", QLabel("Fully offline rule-based classification"))
