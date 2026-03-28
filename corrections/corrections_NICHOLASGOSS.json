@@ -540,6 +540,26 @@
       "fields_corrected": [
         "who"
       ]
+    },
+    {
+      "timestamp": "2026-03-28T17:42:15.887444",
+      "original_filename": "Jan Hall - Complaint Summary.pdf",
+      "text_snippet": " \n \n \n \n12 Jan 2026\n \nAustralian Financial Complaints Authority (AFCA) \nGPO Box 3 \nMelbourne VIC 3001 \n \n \nDear AFCA, \n \nClaimsCo Pty Ltd acts as an Authorised Agent (AA) on behalf of the Complainant ",
+      "ai_result": {
+        "who": "Complainant",
+        "entity": "Allianz",
+        "date": "12.01.2026",
+        "what": "AFCA Submission"
+      },
+      "corrected_result": {
+        "who": "Complainant",
+        "entity": "ClaimsCo",
+        "date": "12.01.2026",
+        "what": "AFCA Submission"
+      },
+      "fields_corrected": [
+        "entity"
+      ]
     }
   ]
 }
