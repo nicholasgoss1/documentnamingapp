@@ -8,7 +8,7 @@ from pathlib import Path
 from copy import deepcopy
 
 APP_NAME = "ClaimsCo Document Tools"
-APP_VERSION = "2.0.8"
+APP_VERSION = "2.0.9"
 
 
 def get_app_data_dir() -> Path:
