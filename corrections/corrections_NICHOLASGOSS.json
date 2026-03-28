@@ -640,6 +640,26 @@
       "fields_corrected": [
         "who"
       ]
+    },
+    {
+      "timestamp": "2026-03-28T17:42:58.879009",
+      "original_filename": "Ezy Projects - SOW - an Hall - 37 Dangar Street, Armidale NSW.pdf",
+      "text_snippet": " \nScope of Repairs:\n \nScope of works\nPage 1\nSupplier:\nClaim Information:\nName:\nAllianz Partners - Ezy\nProjects\nAddress:\n5/373 Manns Road West\nGosford NSW 2250\nPhone Number:\n0733607717\nABN:\n34 608 585 ",
+      "ai_result": {
+        "who": "Complainant",
+        "entity": "ClaimsCo",
+        "date": "25.06.2025",
+        "what": "Scope of Repairs:"
+      },
+      "corrected_result": {
+        "who": "Complainant",
+        "entity": "Ezy Projects",
+        "date": "25.06.2025",
+        "what": "Scope of Repairs:"
+      },
+      "fields_corrected": [
+        "entity"
+      ]
     }
   ]
 }
