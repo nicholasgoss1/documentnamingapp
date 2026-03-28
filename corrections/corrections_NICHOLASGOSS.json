@@ -220,6 +220,26 @@
       "fields_corrected": [
         "what"
       ]
+    },
+    {
+      "timestamp": "2026-03-28T11:56:04.438306",
+      "original_filename": "Complainant - 07.03.2025 - AusCoast - Quote $55,208.19.pdf",
+      "text_snippet": "RA COASTAL PTY LTD T/A AUSCOAST BUILDERS \n1800 595 356 ║ABN: 20642591955 ║ QBCC: 15216455\nwww.auscoastbuilders.com.au║Info@auscoastbuilders.com.au\n \nName:\nCraig Toohill \nAddress:\n17A Railway Street, G",
+      "ai_result": {
+        "who": "Complainant",
+        "entity": "AusCoast",
+        "date": "07.03.2025",
+        "what": "Scope of Works"
+      },
+      "corrected_result": {
+        "who": "Complainant",
+        "entity": "AusCoast",
+        "date": "07.03.2025",
+        "what": "Quote $55,208.19"
+      },
+      "fields_corrected": [
+        "what"
+      ]
     }
   ]
 }
