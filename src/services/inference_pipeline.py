@@ -6,7 +6,7 @@ import os
 import re
 from typing import List, Callable, Optional
 
-from src.core.models import DocumentRecord, DuplicateStatus
+from src.core.models import DocumentRecord, DuplicateStatus, ConfidenceBreakdown
 from src.core.settings import Settings
 from src.services.pdf_extractor import (
     extract_text, extract_page1_text, extract_page1_spatial,
@@ -30,6 +30,30 @@ def process_single_file(file_path: str, settings: Settings) -> DocumentRecord:
     record = DocumentRecord()
     record.file_path = file_path
     record.original_filename = os.path.basename(file_path)
+
+    # ── Corrections cache: exact filename match → confidence 100, skip all inference ──
+    try:
+        from src.services.corrections_store import lookup_by_filename
+        cached = lookup_by_filename(record.original_filename)
+        if cached:
+            record.who = normalize_who(cached.get("who", ""))
+            record.entity = normalize_entity(cached.get("entity", ""), settings)
+            record.what = normalize_what(cached.get("what", ""), settings)
+            record.date = cached.get("date", "NO DATE")
+            record.page1_text = extract_page1_text(file_path)
+            record.extracted_text = extract_text(file_path, max_pages=3)
+            record.file_hash = compute_file_hash(file_path)
+            record.content_hash = compute_content_hash(record.extracted_text)
+            record.confidence = 100
+            record.confidence_breakdown = ConfidenceBreakdown(
+                heading_match=20, date_clarity=20, entity_match=15,
+                doc_type_match=20, date_rule_clarity=15, filename_consistency=10
+            )
+            record.is_unsure = False
+            record.proposed_filename = record.build_proposed_filename()
+            return record
+    except Exception:
+        pass  # Never crash pipeline due to corrections lookup failure
 
     # Check for annexure
     is_annexure, annex_num = detect_annexure(record.original_filename)
