@@ -740,6 +740,26 @@
       "fields_corrected": [
         "entity"
       ]
+    },
+    {
+      "timestamp": "2026-03-28T17:44:10.376774",
+      "original_filename": "2d. FF - 26.05.2025 - PB EZY Projects Scope.pdf",
+      "text_snippet": " \nScope of Repairs:\n \nScope of works\nPage 1\nSupplier:\nClaim Information:\nName:\nAllianz Partners - Ezy\nProjects\nAddress:\n5/373 Manns Road West\nGosford NSW 2250\nPhone Number:\n0733607717\nABN:\n34 608 585 ",
+      "ai_result": {
+        "who": "FF",
+        "entity": "Ezy Projects",
+        "date": "25.06.2025",
+        "what": "Scope of Repairs:"
+      },
+      "corrected_result": {
+        "who": "FF",
+        "entity": "Ezy Projects",
+        "date": "25.06.2025",
+        "what": "Scope of Repairs - $56,480.72"
+      },
+      "fields_corrected": [
+        "what"
+      ]
     }
   ]
 }
