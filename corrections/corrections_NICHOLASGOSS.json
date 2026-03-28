@@ -76,5 +76,11 @@
     "text_fragment": "$576.88",
     "action": "should_not_redact",
     "timestamp": "2026-03-28T12:30:18.942139"
+  },
+  {
+    "document_type": "Quote $55,208.19",
+    "text_fragment": "$312.50",
+    "action": "should_not_redact",
+    "timestamp": "2026-03-28T12:30:22.740508"
   }
 ]
