@@ -25,36 +25,56 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: claimsco-documents-manager
+          fetch-depth: 2
 
       - name: Determine release type
         id: release_type
         shell: pwsh
         run: |
-          $changed = git diff --name-only HEAD~1 HEAD 2>$null
-          $aiOnly = $true
-          foreach ($file in $changed) {
-            if ($file -ne "src/services/seed_examples.py") {
-              $aiOnly = $false
-              break
+          $aiOnly = "false"
+          try {
+            $changed = git diff --name-only HEAD~1 HEAD 2>&1
+            if ($LASTEXITCODE -eq 0 -and $changed) {
+              $allSeedsOnly = $true
+              foreach ($file in $changed) {
+                if ($file.Trim() -ne "src/services/seed_examples.py") {
+                  $allSeedsOnly = $false
+                  break
+                }
+              }
+              if ($allSeedsOnly) {
+                $aiOnly = "true"
+              }
             }
+          } catch {
+            Write-Output "git diff failed — treating as app update"
           }
           if ("${{ github.event.inputs.force_app_release }}" -eq "true") {
-            $aiOnly = $false
+            $aiOnly = "false"
           }
           echo "ai_only=$aiOnly" >> $env:GITHUB_OUTPUT
-          echo "Release type: $(if ($aiOnly) {'AI update'} else {'App update'})"
+          Write-Output "Release type: $(if ($aiOnly -eq 'true') {'AI update'} else {'App update'})"
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
+      - name: Get version
+        id: version
+        shell: pwsh
+        run: |
+          $v = python -c "from src.core.settings import APP_VERSION; print(APP_VERSION)"
+          echo "version=$v" >> $env:GITHUB_OUTPUT
+
       - name: Install Python dependencies
+        if: steps.release_type.outputs.ai_only != 'true'
         run: |
           pip install -r requirements.txt
           pip install pyinstaller
 
       - name: Write Groq API key
+        if: steps.release_type.outputs.ai_only != 'true'
         shell: pwsh
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
@@ -68,6 +88,7 @@ jobs:
           }
 
       - name: Write GitHub sync token
+        if: steps.release_type.outputs.ai_only != 'true'
         shell: pwsh
         env:
           SYNC_TOKEN: ${{ secrets.SYNC_TOKEN }}
@@ -81,12 +102,15 @@ jobs:
           }
 
       - name: Build with PyInstaller
+        if: steps.release_type.outputs.ai_only != 'true'
         run: python -m PyInstaller build.spec --clean --noconfirm
 
       - name: Install Inno Setup
+        if: steps.release_type.outputs.ai_only != 'true'
         run: choco install innosetup --yes --no-progress
 
       - name: Build installer
+        if: steps.release_type.outputs.ai_only != 'true'
         shell: pwsh
         run: |
           & "C:/Program Files (x86)/Inno Setup 6/ISCC.exe" packaging/installer.iss
@@ -96,15 +120,8 @@ jobs:
           }
           Write-Output "Installer built successfully"
 
-      - name: Get version
-        id: version
-        shell: pwsh
-        run: |
-          $v = python -c "from src.core.settings import APP_VERSION; print(APP_VERSION)"
-          echo "version=$v" >> $env:GITHUB_OUTPUT
-
       - name: Create App Release (code changed)
-        if: steps.release_type.outputs.ai_only == 'False'
+        if: steps.release_type.outputs.ai_only != 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version }}
@@ -121,7 +138,7 @@ jobs:
           make_latest: true
 
       - name: Create AI Release (seeds only)
-        if: steps.release_type.outputs.ai_only == 'True'
+        if: steps.release_type.outputs.ai_only == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version }}-ai-update-${{ github.run_number }}
@@ -131,7 +148,5 @@ jobs:
             This release contains updated AI examples only.
             Existing staff do NOT need to download — improvements are delivered silently via the learning loop.
             New installs will include these improvements automatically.
-          files: |
-            installer_output/ClaimsCo_Tools_Setup_latest.exe
           token: ${{ secrets.GITHUB_TOKEN }}
           make_latest: false
