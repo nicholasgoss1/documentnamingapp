@@ -400,6 +400,26 @@
       "fields_corrected": [
         "what"
       ]
+    },
+    {
+      "timestamp": "2026-03-28T17:41:17.564763",
+      "original_filename": "Letter of Iinstruction - Jan Hall - 37 Dangar Street, Armidale NSW 2350.docx",
+      "text_snippet": "IDR lodgement template\n23 March 2026\nGTEK Infrared\nDelivered via email: grant@gtek.com.au \nClient name:\t Jan Hall\nAddress:\t\t 37 Dangar Street, Armidale NSW 2350\nDate of Loss:\t 23 January 2025\nDear GTE",
+      "ai_result": {
+        "who": "Complainant",
+        "entity": "GTEK Infrared",
+        "date": "23.03.2026",
+        "what": "Brief to Expert"
+      },
+      "corrected_result": {
+        "who": "Complainant",
+        "entity": "ClaimsCo",
+        "date": "23.03.2026",
+        "what": "Brief to Expert"
+      },
+      "fields_corrected": [
+        "entity"
+      ]
     }
   ]
 }
