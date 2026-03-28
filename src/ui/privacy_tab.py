@@ -31,7 +31,7 @@ def _groq_available() -> bool:
         return False
 
 
-def _detect_pii_with_groq(text: str) -> list:
+def _detect_pii_with_groq(text: str, few_shot_block: str = "") -> list:
     """Use Groq to detect PII strings in text. Returns list of strings."""
     try:
         from src.services.ai_classifier import _GROQ_API_KEY
@@ -40,20 +40,22 @@ def _detect_pii_with_groq(text: str) -> list:
         from groq import Groq
         import json as _json
         client = Groq(api_key=_GROQ_API_KEY)
+
+        system_content = (
+            "You are a privacy redaction assistant for Australian insurance documents. "
+            "Find all personally identifiable information in the text. Return ONLY "
+            "a JSON object with key 'pii_items' containing a list of exact strings to "
+            "redact. Include: full names (2+ words), complete addresses, phone numbers, "
+            "email addresses, policy numbers, claim numbers, job numbers, ABN/ACN numbers. "
+            "Do NOT include company names like insurers or builders. Only personal client info."
+        )
+        if few_shot_block:
+            system_content += "\n\n" + few_shot_block
+
         response = client.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a privacy redaction assistant for Australian insurance documents. "
-                        "Find all personally identifiable information in the text. Return ONLY "
-                        "a JSON object with key 'pii_items' containing a list of exact strings to "
-                        "redact. Include: full names (2+ words), complete addresses, phone numbers, "
-                        "email addresses, policy numbers, claim numbers, job numbers, ABN/ACN numbers. "
-                        "Do NOT include company names like insurers or builders. Only personal client info."
-                    ),
-                },
+                {"role": "system", "content": system_content},
                 {"role": "user", "content": f"Find all PII:\n\n{text[:3000]}"},
             ],
             response_format={"type": "json_object"},
@@ -170,139 +172,126 @@ class DropZone(QFrame):
             self.files_dropped.emit(files)
 
 
-class AutoRedactWorker(QThread):
-    """Background worker for auto-detecting PII in PDFs using regex + Groq."""
+def _search_pii_on_page(page, page_num, pii_text, box_type, seen):
+    """Search for PII text on a page, return list of non-overlapping RedactionBox."""
+    boxes = []
+    try:
+        for r in page.search_for(pii_text.strip()):
+            key = (page_num, round(r.x0, 1), round(r.y0, 1), round(r.x1, 1), round(r.y1, 1))
+            if key not in seen:
+                seen.add(key)
+                boxes.append(RedactionBox(page_num, (r.x0, r.y0, r.x1, r.y1), box_type, pii_text.strip()))
+    except Exception:
+        pass
+    return boxes
+
+
+class RegexRedactWorker(QThread):
+    """Background worker — regex PII detection only (no Groq)."""
     progress = Signal(int, int)
     page_done = Signal(int, list)
-    finished = Signal(dict)  # {names, addresses, phones, refs, total, used_groq}
+    finished = Signal(dict)
 
     def __init__(self, file_path: str, parent=None):
         super().__init__(parent)
         self._file_path = file_path
 
-    def _search_and_add(self, page, page_num, pii_text, boxes, seen):
-        try:
-            for r in page.search_for(pii_text.strip()):
-                key = (page_num, round(r.x0, 1), round(r.y0, 1), round(r.x1, 1), round(r.y1, 1))
-                if key not in seen:
-                    seen.add(key)
-                    boxes.append(RedactionBox(page_num, (r.x0, r.y0, r.x1, r.y1), "AUTO", pii_text.strip()))
-        except Exception:
-            pass
-
     def run(self):
-        counts = {"names": 0, "addresses": 0, "phones": 0, "refs": 0, "total": 0, "used_groq": False}
+        counts = {"names": 0, "addresses": 0, "phones": 0, "refs": 0, "total": 0}
         try:
             doc = fitz.open(self._file_path)
-            total_pages = len(doc)
-            full_text_parts = []
-
-            for page_num in range(total_pages):
-                self.progress.emit(page_num + 1, total_pages)
+            for page_num in range(len(doc)):
+                self.progress.emit(page_num + 1, len(doc))
                 page = doc[page_num]
                 text = page.get_text()
-                full_text_parts.append(text)
                 boxes = []
                 seen = set()
 
-                # ── PASS 1: Regex (always runs, works offline) ──
+                for m in _RE_LABEL_VALUE.finditer(text):
+                    v = m.group(1).strip()
+                    if len(v) >= 3:
+                        b = _search_pii_on_page(page, page_num, v, "AUTO", seen)
+                        counts["names"] += len(b)
+                        boxes.extend(b)
 
-                # Label-value pairs
-                try:
-                    for m in _RE_LABEL_VALUE.finditer(text):
-                        value = m.group(1).strip()
-                        if len(value) >= 3:
-                            before = len(boxes)
-                            self._search_and_add(page, page_num, value, boxes, seen)
-                            counts["names"] += len(boxes) - before
-                except Exception:
-                    pass
+                for m in _RE_ADDRESS.finditer(text):
+                    b = _search_pii_on_page(page, page_num, m.group(), "AUTO", seen)
+                    counts["addresses"] += len(b)
+                    boxes.extend(b)
 
-                # Full address
-                try:
-                    for m in _RE_ADDRESS.finditer(text):
-                        before = len(boxes)
-                        self._search_and_add(page, page_num, m.group(), boxes, seen)
-                        counts["addresses"] += len(boxes) - before
-                except Exception:
-                    pass
+                for m in _RE_STREET.finditer(text):
+                    b = _search_pii_on_page(page, page_num, m.group(), "AUTO", seen)
+                    counts["addresses"] += len(b)
+                    boxes.extend(b)
 
-                # Street number
-                try:
-                    for m in _RE_STREET.finditer(text):
-                        before = len(boxes)
-                        self._search_and_add(page, page_num, m.group(), boxes, seen)
-                        counts["addresses"] += len(boxes) - before
-                except Exception:
-                    pass
+                for m in _RE_PHONE.finditer(text):
+                    mt = m.group().strip()
+                    if len(mt) >= 8:
+                        b = _search_pii_on_page(page, page_num, mt, "AUTO", seen)
+                        counts["phones"] += len(b)
+                        boxes.extend(b)
 
-                # Phone numbers
-                try:
-                    for m in _RE_PHONE.finditer(text):
-                        matched = m.group().strip()
-                        if len(matched) >= 8:
-                            before = len(boxes)
-                            self._search_and_add(page, page_num, matched, boxes, seen)
-                            counts["phones"] += len(boxes) - before
-                except Exception:
-                    pass
+                for m in _RE_POLICY.finditer(text):
+                    b = _search_pii_on_page(page, page_num, m.group(), "AUTO", seen)
+                    counts["refs"] += len(b)
+                    boxes.extend(b)
 
-                # Policy/claim numbers
-                try:
-                    for m in _RE_POLICY.finditer(text):
-                        before = len(boxes)
-                        self._search_and_add(page, page_num, m.group(), boxes, seen)
-                        counts["refs"] += len(boxes) - before
-                except Exception:
-                    pass
+                for m in _RE_REF_LABEL.finditer(text):
+                    ref = m.group(1).strip()
+                    if len(ref) >= 4:
+                        b = _search_pii_on_page(page, page_num, ref, "AUTO", seen)
+                        counts["refs"] += len(b)
+                        boxes.extend(b)
 
-                # Reference numbers near labels
-                try:
-                    for m in _RE_REF_LABEL.finditer(text):
-                        ref = m.group(1).strip()
-                        if len(ref) >= 4:
-                            before = len(boxes)
-                            self._search_and_add(page, page_num, ref, boxes, seen)
-                            counts["refs"] += len(boxes) - before
-                except Exception:
-                    pass
-
-                # Account numbers
-                try:
-                    for m in _RE_ACCOUNT.finditer(text):
-                        before = len(boxes)
-                        self._search_and_add(page, page_num, m.group(), boxes, seen)
-                        counts["refs"] += len(boxes) - before
-                except Exception:
-                    pass
+                for m in _RE_ACCOUNT.finditer(text):
+                    b = _search_pii_on_page(page, page_num, m.group(), "AUTO", seen)
+                    counts["refs"] += len(b)
+                    boxes.extend(b)
 
                 self.page_done.emit(page_num, boxes)
+            doc.close()
+        except Exception as e:
+            logger.debug("Regex redact error: %s", e)
+        counts["total"] = counts["names"] + counts["addresses"] + counts["phones"] + counts["refs"]
+        self.finished.emit(counts)
 
-            # ── PASS 2: Groq AI name/PII detection (silent fail) ──
-            try:
-                full_text = "\n".join(full_text_parts)
-                groq_items = _detect_pii_with_groq(full_text)
-                if groq_items:
-                    counts["used_groq"] = True
-                    for pii_text in groq_items:
-                        for page_num in range(total_pages):
-                            page = doc[page_num]
-                            before_total = counts["names"]
-                            seen_g = set()
-                            self._search_and_add(page, page_num, pii_text, [], seen_g)
-                            for r in page.search_for(pii_text.strip()):
-                                key = (page_num, round(r.x0, 1), round(r.y0, 1), round(r.x1, 1), round(r.y1, 1))
-                                box = RedactionBox(page_num, (r.x0, r.y0, r.x1, r.y1), "AUTO", pii_text.strip())
-                                self.page_done.emit(page_num, [box])
-                                counts["names"] += 1
-            except Exception as e:
-                logger.debug("Groq PII pass failed: %s", e)
+
+class AIRedactWorker(QThread):
+    """Background worker — Groq AI PII detection only. Boxes typed as 'AI'."""
+    progress = Signal(str)  # status message
+    finished = Signal(list, int)  # list of RedactionBox, count
+
+    def __init__(self, file_path: str, parent=None):
+        super().__init__(parent)
+        self._file_path = file_path
+
+    def run(self):
+        all_boxes = []
+        try:
+            self.progress.emit("Extracting text...")
+            doc = fitz.open(self._file_path)
+            full_text = "\n".join(page.get_text() for page in doc)
+
+            self.progress.emit("Sending to Groq AI...")
+            # Build prompt with corrections few-shot
+            from src.services.redaction_corrections import build_redaction_few_shot
+            few_shot = build_redaction_few_shot()
+
+            pii_items = _detect_pii_with_groq(full_text, few_shot_block=few_shot)
+
+            if pii_items:
+                self.progress.emit(f"Found {len(pii_items)} items, locating on pages...")
+                seen = set()
+                for pii_text in pii_items:
+                    for page_num in range(len(doc)):
+                        page = doc[page_num]
+                        boxes = _search_pii_on_page(page, page_num, pii_text, "AI", seen)
+                        all_boxes.extend(boxes)
 
             doc.close()
         except Exception as e:
-            logger.debug("Auto-redact error: %s", e)
-        counts["total"] = counts["names"] + counts["addresses"] + counts["phones"] + counts["refs"]
-        self.finished.emit(counts)
+            logger.debug("AI redact error: %s", e)
+        self.finished.emit(all_boxes, len(all_boxes))
 
 
 class PageWidget(QLabel):
@@ -351,9 +340,17 @@ class PageWidget(QLabel):
             x0, y0, x1, y1 = box.pdf_rect
             s = self._dpi_scale
             rect = QRectF(x0 * s, y0 * s, (x1 - x0) * s, (y1 - y0) * s)
-            if box.type == "AUTO":
+            if box.type == "AI":
+                # AI boxes: red border + light red fill so user can distinguish
+                painter.fillRect(rect, QColor(255, 0, 0, 60))
+                painter.setPen(QPen(QColor(255, 0, 0), 2))
+                painter.drawRect(rect)
+                painter.setPen(Qt.NoPen)
+            elif box.type == "AUTO":
+                # Regex boxes: solid red fill
                 painter.fillRect(rect, QColor(255, 0, 0, 120))
             else:
+                # Manual boxes: black fill
                 painter.fillRect(rect, QColor(0, 0, 0, 255))
         painter.end()
         super().setPixmap(canvas)
@@ -489,10 +486,17 @@ class PrivacyTab(QWidget):
 
         # Toolbar
         toolbar = QHBoxLayout()
-        self._auto_btn = QPushButton("Auto Redact")
-        self._auto_btn.setObjectName("primaryButton")
-        self._auto_btn.clicked.connect(self._auto_redact)
-        toolbar.addWidget(self._auto_btn)
+        self._regex_btn = QPushButton("Regex Redact")
+        self._regex_btn.clicked.connect(self._regex_redact)
+        toolbar.addWidget(self._regex_btn)
+
+        self._ai_btn = QPushButton("AI Redact")
+        self._ai_btn.setObjectName("primaryButton")
+        self._ai_btn.clicked.connect(self._ai_redact)
+        if not _groq_available():
+            self._ai_btn.setEnabled(False)
+            self._ai_btn.setToolTip("Groq AI unavailable")
+        toolbar.addWidget(self._ai_btn)
 
         self._draw_btn = QToolButton()
         self._draw_btn.setText("Draw Box")
@@ -660,59 +664,93 @@ class PrivacyTab(QWidget):
 
     # ── Toolbar actions ──
 
-    def _auto_redact(self):
+    def _get_doc_type(self) -> str:
+        """Extract document type from filename for corrections logging."""
+        if not self._current_file:
+            return ""
+        fn = os.path.basename(self._current_file)
+        name = os.path.splitext(fn)[0]
+        segments = [s.strip() for s in name.split(" - ")]
+        return segments[3] if len(segments) >= 4 else segments[-1] if segments else ""
+
+    def _regex_redact(self):
+        """Run regex-only PII detection (no Groq)."""
         if not self._current_file:
             QMessageBox.information(self, "No File", "Select a PDF file first.")
             return
         self._progress.setVisible(True)
         self._progress.setValue(0)
-        self._auto_btn.setEnabled(False)
-        self._worker = AutoRedactWorker(self._current_file)
+        self._regex_btn.setEnabled(False)
+        self._worker = RegexRedactWorker(self._current_file)
         self._worker.progress.connect(lambda c, t: (
             self._progress.setMaximum(t), self._progress.setValue(c)
         ))
-        self._worker.page_done.connect(self._on_auto_page_done)
-        self._worker.finished.connect(self._on_auto_finished)
+        self._worker.page_done.connect(self._on_regex_page_done)
+        self._worker.finished.connect(self._on_regex_finished)
         self._worker.start()
 
-    def _on_auto_page_done(self, page_num: int, boxes: list):
+    def _on_regex_page_done(self, page_num: int, boxes: list):
         if self._current_file:
-            existing = self._redactions.setdefault(self._current_file, [])
-            existing.extend(boxes)
+            self._redactions.setdefault(self._current_file, []).extend(boxes)
 
-    def _on_auto_finished(self, counts: dict):
+    def _on_regex_finished(self, counts: dict):
         self._progress.setVisible(False)
-        self._auto_btn.setEnabled(True)
+        self._regex_btn.setEnabled(True)
         self._worker = None
-
-        # Show summary
         total = counts.get("total", 0)
-        used_groq = counts.get("used_groq", False)
         if total > 0:
             parts = []
             if counts.get("names"):
-                method = "AI+regex" if used_groq else "regex"
-                parts.append(f"{counts['names']} names/addresses ({method})")
+                parts.append(f"{counts['names']} label values")
             if counts.get("addresses"):
                 parts.append(f"{counts['addresses']} addresses")
             if counts.get("phones"):
-                parts.append(f"{counts['phones']} phone numbers")
+                parts.append(f"{counts['phones']} phones")
             if counts.get("refs"):
-                parts.append(f"{counts['refs']} reference numbers")
-            self._summary_label.setText(f"Found {total} items to redact: {', '.join(parts)}")
+                parts.append(f"{counts['refs']} refs")
+            self._summary_label.setText(f"Regex found {total} items: {', '.join(parts)}")
             self._summary_label.setStyleSheet("padding: 6px; border: 1px solid #a6e3a1; border-radius: 4px;")
-        elif not used_groq:
-            self._summary_label.setText("No PII detected (regex only). Check manually for names.")
-            self._summary_label.setStyleSheet("padding: 6px; border: 1px solid #f9e2af; border-radius: 4px;")
         else:
-            self._summary_label.setText("No PII detected automatically. Use Draw Box to manually mark sensitive areas.")
+            self._summary_label.setText("No PII found by regex. Try AI Redact or Draw Box.")
             self._summary_label.setStyleSheet("padding: 6px; border: 1px solid #f9e2af; border-radius: 4px;")
         self._summary_label.setVisible(True)
-
-        # Re-render to show all boxes
         if self._current_file:
             self._render_file(self._current_file)
             self._update_redactions_panel()
+
+    def _ai_redact(self):
+        """Run Groq AI PII detection (separate from regex)."""
+        if not self._current_file:
+            QMessageBox.information(self, "No File", "Select a PDF file first.")
+            return
+        if not _groq_available():
+            self._summary_label.setText("AI unavailable. Use Regex Redact or Draw Box.")
+            self._summary_label.setStyleSheet("padding: 6px; border: 1px solid #f38ba8; border-radius: 4px;")
+            self._summary_label.setVisible(True)
+            return
+        self._ai_btn.setEnabled(False)
+        self._summary_label.setText("Sending to Groq AI...")
+        self._summary_label.setStyleSheet("padding: 6px; border: 1px solid #89b4fa; border-radius: 4px;")
+        self._summary_label.setVisible(True)
+        self._worker = AIRedactWorker(self._current_file)
+        self._worker.progress.connect(lambda msg: self._summary_label.setText(msg))
+        self._worker.finished.connect(self._on_ai_finished)
+        self._worker.start()
+
+    def _on_ai_finished(self, boxes: list, count: int):
+        self._ai_btn.setEnabled(True)
+        self._worker = None
+        if self._current_file and boxes:
+            self._redactions.setdefault(self._current_file, []).extend(boxes)
+            self._render_file(self._current_file)
+            self._update_redactions_panel()
+        if count > 0:
+            self._summary_label.setText(f"AI found {count} items to redact")
+            self._summary_label.setStyleSheet("padding: 6px; border: 1px solid #a6e3a1; border-radius: 4px;")
+        else:
+            self._summary_label.setText("AI found no additional PII. Use Draw Box if needed.")
+            self._summary_label.setStyleSheet("padding: 6px; border: 1px solid #f9e2af; border-radius: 4px;")
+        self._summary_label.setVisible(True)
 
     def _toggle_draw(self, checked: bool):
         self._draw_mode = checked
@@ -735,8 +773,28 @@ class PrivacyTab(QWidget):
 
     def _on_box_drawn(self, page_num: int, pdf_rect: tuple):
         if self._current_file:
-            box = RedactionBox(page_num, pdf_rect, "MANUAL", "")
+            # Try to find what text is under this manually drawn box
+            drawn_text = ""
+            try:
+                doc = fitz.open(self._current_file)
+                page = doc[page_num]
+                rect = fitz.Rect(*pdf_rect)
+                drawn_text = page.get_text("text", clip=rect).strip()
+                doc.close()
+            except Exception:
+                pass
+
+            box = RedactionBox(page_num, pdf_rect, "MANUAL", drawn_text)
             self._redactions.setdefault(self._current_file, []).append(box)
+
+            # Log correction: user drew a box = this text should be redacted
+            if drawn_text and len(drawn_text) >= 2:
+                try:
+                    from src.services.redaction_corrections import log_redaction_correction
+                    log_redaction_correction(self._get_doc_type(), drawn_text, "should_redact")
+                except Exception:
+                    pass
+
             self._render_file(self._current_file)
             self._update_redactions_panel()
 
@@ -751,6 +809,13 @@ class PrivacyTab(QWidget):
                 continue
             x0, y0, x1, y1 = box.pdf_rect
             if x0 <= px <= x1 and y0 <= py <= y1:
+                # Log correction if erasing an AI box
+                if box.type == "AI" and box.text:
+                    try:
+                        from src.services.redaction_corrections import log_redaction_correction
+                        log_redaction_correction(self._get_doc_type(), box.text, "should_not_redact")
+                    except Exception:
+                        pass
                 boxes.pop(i)
                 self._render_file(self._current_file)
                 self._update_redactions_panel()
