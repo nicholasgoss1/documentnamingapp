@@ -48,8 +48,14 @@ if %ERRORLEVEL% EQU 0 (
 if defined ISCC_PATH (
     echo [4/4] Building installer with Inno Setup...
     "%ISCC_PATH%" packaging\installer.iss
+    if errorlevel 1 (
+        echo Primary output blocked. Retrying to C:\Projects\installer_out\ ...
+        if not exist "C:\Projects\installer_out" mkdir "C:\Projects\installer_out"
+        "%ISCC_PATH%" packaging\installer.iss /O"C:\Projects\installer_out"
+    )
     echo.
-    echo Installer created: installer_output\ClaimsCo_Tools_Setup_v2.0.1.exe
+    echo Installer created in: installer_output\
+    echo Fallback location:    C:\Projects\installer_out\
 ) else (
     echo [4/4] Inno Setup not found. Skipping installer creation.
     echo       Install Inno Setup from https://jrsoftware.org/isdl.php
