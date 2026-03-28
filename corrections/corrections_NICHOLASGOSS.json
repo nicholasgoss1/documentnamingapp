@@ -620,6 +620,26 @@
       "fields_corrected": [
         "entity"
       ]
+    },
+    {
+      "timestamp": "2026-03-28T17:42:47.648338",
+      "original_filename": "Inspection Report - 25NSW0037DANG (2).pdf",
+      "text_snippet": "1800 569 132\n346/7 Clunies Ross Court,\nEight Mile Plains,\nQLD 4113\nDate\n06/08/2025\nSolar Inspection Report\n\nClaim Number\nInsurer\nJob Requested by\nAuscoast Builders\nRequestor Contact\n1800 595 356\nEvent",
+      "ai_result": {
+        "who": "FF",
+        "entity": "Solarez",
+        "date": "08.06.2025",
+        "what": "Solar Inspection Report"
+      },
+      "corrected_result": {
+        "who": "Complainant",
+        "entity": "Solarez",
+        "date": "08.06.2025",
+        "what": "Solar Inspection Report"
+      },
+      "fields_corrected": [
+        "who"
+      ]
     }
   ]
 }
