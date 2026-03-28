@@ -76,5 +76,11 @@
     "text_fragment": "23 January 2025",
     "action": "should_not_redact",
     "timestamp": "2026-03-28T18:10:11.637597"
+  },
+  {
+    "document_type": "Instructions to GTEK (2)",
+    "text_fragment": "23 January 2025",
+    "action": "should_not_redact",
+    "timestamp": "2026-03-28T18:10:12.664225"
   }
 ]
