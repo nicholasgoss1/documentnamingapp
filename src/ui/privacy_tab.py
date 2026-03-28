@@ -693,13 +693,16 @@ class PrivacyTab(QWidget):
     # ── Toolbar actions ──
 
     def _get_doc_type(self) -> str:
-        """Extract document type from filename for corrections logging."""
+        """Extract document type from filename for corrections logging.
+        Strips dollar amounts so 'Quote $55,208.19' becomes 'Quote'.
+        """
         if not self._current_file:
             return ""
         fn = os.path.basename(self._current_file)
         name = os.path.splitext(fn)[0]
         segments = [s.strip() for s in name.split(" - ")]
-        return segments[3] if len(segments) >= 4 else segments[-1] if segments else ""
+        doc_type = segments[3] if len(segments) >= 4 else segments[-1] if segments else ""
+        return re.sub(r'\s*\$[\d,]+\.?\d*', '', doc_type).strip()
 
     def _regex_redact(self):
         """Run regex-only PII detection (no Groq)."""
