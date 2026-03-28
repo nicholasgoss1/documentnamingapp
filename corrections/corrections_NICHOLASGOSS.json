@@ -88,5 +88,11 @@
     "text_fragment": "Allianz Insurance",
     "action": "should_not_redact",
     "timestamp": "2026-03-28T18:10:13.673760"
+  },
+  {
+    "document_type": "Instructions to GTEK (2)",
+    "text_fragment": "Allianz Insurance",
+    "action": "should_not_redact",
+    "timestamp": "2026-03-28T18:10:14.731415"
   }
 ]
