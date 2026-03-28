@@ -500,6 +500,26 @@
       "fields_corrected": [
         "what"
       ]
+    },
+    {
+      "timestamp": "2026-03-28T17:42:00.282973",
+      "original_filename": "Jan Hall- 37 Dangar Street Armidale NSW - DOA.pdf",
+      "text_snippet": "",
+      "ai_result": {
+        "who": "Complainant",
+        "entity": "Dangar Street Armidale NSW",
+        "date": "14/04/2025",
+        "what": "Delegation of authority"
+      },
+      "corrected_result": {
+        "who": "Complainant",
+        "entity": "Jan Hall",
+        "date": "14/04/2025",
+        "what": "Delegation of authority"
+      },
+      "fields_corrected": [
+        "entity"
+      ]
     }
   ]
 }
