@@ -340,6 +340,26 @@
       "fields_corrected": [
         "entity"
       ]
+    },
+    {
+      "timestamp": "2026-03-28T17:40:44.016819",
+      "original_filename": "Letter of Iinstruction - Jan Hall - 37 Dangar Street, Armidale NSW 2350.pdf",
+      "text_snippet": " \n23 March 2026 \n \n \nGTEK Infrared \n \nDelivered via email: grant@gtek.com.au \n \n \n \nClient name: \n Jan Hall \nAddress: \n 37 Dangar Street, Armidale NSW 2350 \nDate of Loss: \n 23 January 2025 \n \n \nDear G",
+      "ai_result": {
+        "who": "FF",
+        "entity": "GTEK Infrared",
+        "date": "23.03.2026",
+        "what": "Expert Report"
+      },
+      "corrected_result": {
+        "who": "FF",
+        "entity": "ClaimsCo",
+        "date": "23.03.2026",
+        "what": "Expert Report"
+      },
+      "fields_corrected": [
+        "entity"
+      ]
     }
   ]
 }
