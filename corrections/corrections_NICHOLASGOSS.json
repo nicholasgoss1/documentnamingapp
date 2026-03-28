@@ -600,6 +600,26 @@
       "fields_corrected": [
         "entity"
       ]
+    },
+    {
+      "timestamp": "2026-03-28T17:42:41.801277",
+      "original_filename": "Ezy Projects Roof Report - Jan Hall - 37 Dangar Street, Armidale NSW.pdf",
+      "text_snippet": " \n \n \n \nBUILDERS ROOF REPORT\n \nClaim Number: 6200198762 \nConducted on 06/05/2025 \nPrepared by: Carlo Cervo \nLocation: 37 Dangar Street, Armidale NSW 2350 \n \n \nEZ18354-CF46612 Roof Report\n \nFront of Pr",
+      "ai_result": {
+        "who": "FF",
+        "entity": "37 Dangar Street, Armidale NSW",
+        "date": "06.05.2025",
+        "what": "Roof Report"
+      },
+      "corrected_result": {
+        "who": "FF",
+        "entity": "Ezy Projects",
+        "date": "06.05.2025",
+        "what": "Roof Report"
+      },
+      "fields_corrected": [
+        "entity"
+      ]
     }
   ]
 }
