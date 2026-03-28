@@ -920,6 +920,26 @@
       "fields_corrected": [
         "what"
       ]
+    },
+    {
+      "timestamp": "2026-03-28T17:48:41.980727",
+      "original_filename": "00400625 - Complaint response letter - Decision (AAL).pdf",
+      "text_snippet": " \n \n \n \n \n \n \n \n \n\n \n \n \n \n\n \n \n \n \n\n",
+      "ai_result": {
+        "who": "FF",
+        "entity": "AAL",
+        "date": "NO DATE",
+        "what": "No Date"
+      },
+      "corrected_result": {
+        "who": "FF",
+        "entity": "Allianz",
+        "date": "NO DATE",
+        "what": "No Date"
+      },
+      "fields_corrected": [
+        "entity"
+      ]
     }
   ]
 }
