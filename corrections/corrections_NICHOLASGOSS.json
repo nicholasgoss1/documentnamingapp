@@ -154,5 +154,11 @@
     "text_fragment": "Info@auscoastbuilders.com.au",
     "action": "should_not_redact",
     "timestamp": "2026-03-28T12:32:08.036059"
+  },
+  {
+    "document_type": "Quote $55,208.19",
+    "text_fragment": "1800 595 356",
+    "action": "should_not_redact",
+    "timestamp": "2026-03-28T12:32:09.236541"
   }
 ]
