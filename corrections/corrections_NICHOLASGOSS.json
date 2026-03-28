@@ -280,6 +280,26 @@
       "fields_corrected": [
         "date"
       ]
+    },
+    {
+      "timestamp": "2026-03-28T17:39:55.011872",
+      "original_filename": "Signed Engagement - Jan Hall- 37 Dangar Street Armidale NSW.pdf",
+      "text_snippet": "\n\n\n\n\n",
+      "ai_result": {
+        "who": "Complainant",
+        "entity": "Jan Hall",
+        "date": "14/04/2025",
+        "what": "Engagement"
+      },
+      "corrected_result": {
+        "who": "Complainant",
+        "entity": "Jan Hall",
+        "date": "14/04/2025",
+        "what": "Letter of Engagement"
+      },
+      "fields_corrected": [
+        "what"
+      ]
     }
   ]
 }
