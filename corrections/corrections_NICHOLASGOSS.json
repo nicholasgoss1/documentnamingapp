@@ -22,5 +22,11 @@
     "text_fragment": "$13,566.25",
     "action": "should_not_redact",
     "timestamp": "2026-03-28T12:30:04.547854"
+  },
+  {
+    "document_type": "Quote $55,208.19",
+    "text_fragment": "Info@auscoastbuilders.com.au",
+    "action": "should_not_redact",
+    "timestamp": "2026-03-28T12:30:06.425063"
   }
 ]
