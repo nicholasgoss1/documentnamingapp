@@ -980,6 +980,26 @@
       "fields_corrected": [
         "what"
       ]
+    },
+    {
+      "timestamp": "2026-03-28T17:49:17.078385",
+      "original_filename": "00379979-Complaint response letter – Decision (AAL)-22102025.pdf",
+      "text_snippet": "Allianz Australia Insurance Ltd\nLevel 16, Brookfield Place, 10 Carrington Street, Sydney, NSW 2000\nABN 15 000 122 850 AFS Licence No. 234708\n DSO: 25.04.006-01\n22 October 2025\nJan Norma Hall\nC/- Emily",
+      "ai_result": {
+        "who": "FF",
+        "entity": "Allianz",
+        "date": "22.10.2025",
+        "what": "Notice of Response"
+      },
+      "corrected_result": {
+        "who": "FF",
+        "entity": "Allianz",
+        "date": "22.10.2025",
+        "what": "IDR FDL"
+      },
+      "fields_corrected": [
+        "what"
+      ]
     }
   ]
 }
